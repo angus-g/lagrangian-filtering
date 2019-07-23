@@ -19,6 +19,12 @@ def ParticleFactory(variables, name="SamplingParticle", BaseClass=parcels.JITPar
     return newclass
 
 
+def recovery_kernel_out_of_bounds(particle, fieldset, time):
+    """Recovery kernel for particle advection, to delete out-of-bounds particles."""
+
+    particle.state = parcels.ErrorCode.Delete
+
+
 class LagrangeFilter(object):
     """The main Lagrangian filter class, holds all the required state.
     """
@@ -114,6 +120,9 @@ class LagrangeFilter(object):
             runtime=self.window_size,
             dt=self.advection_dt,
             output_file=outfile_forward,
+            recovery={
+                parcels.ErrorCode.ErrorOutOfBounds: recovery_kernel_out_of_bounds
+            },
         )
 
         # reseed particles, but advect backwards (using negative dt)
@@ -126,6 +135,9 @@ class LagrangeFilter(object):
             runtime=self.window_size,
             dt=-self.advection_dt,
             output_file=outfile_backward,
+            recovery={
+                parcels.ErrorCode.ErrorOutOfBounds: recovery_kernel_out_of_bounds
+            },
         )
 
         # filter data from output files and write back this timestep
