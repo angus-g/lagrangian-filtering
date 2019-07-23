@@ -77,6 +77,8 @@ class LagrangeFilter(object):
         f_str = "def sample_kernel(particle, fieldset, time):\n"
         for v in self.sample_fields.keys():
             f_str += f"\tparticle.var_{v} = fieldset.{v}[time, particle.depth, particle.lat, particle.lon]\n"
+        else:
+            f_str += "\tpass"
 
         # create the kernel
         self.sample_kernel = Kernel(
