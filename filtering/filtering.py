@@ -1,10 +1,9 @@
 import numpy as np
 from datetime import timedelta
-from parcels import FieldSet, ParticleSet, JITParticle, Variable
-from parcels import AdvectionRK4, Kernel
+import parcels
 
 
-def ParticleFactory(variables, name="SamplingParticle", BaseClass=JITParticle):
+def ParticleFactory(variables, name="SamplingParticle", BaseClass=parcels.JITParticle):
     """Create a Particle class that samples the specified variables.
 
     variables is a dictionary mapping variable names to a field from which
@@ -12,7 +11,8 @@ def ParticleFactory(variables, name="SamplingParticle", BaseClass=JITParticle):
     attributes on the Particle class are prepended by 'var_'."""
 
     var_dict = {
-        "var_" + v: Variable("var_" + v, initial=f) for v, f in variables.items()
+        "var_" + v: parcels.Variable("var_" + v, initial=f)
+        for v, f in variables.items()
     }
 
     newclass = type(name, (BaseClass,), var_dict)
@@ -49,7 +49,7 @@ class LagrangeFilter(object):
 
         # construct the OceanParcels FieldSet
         # to use for particle advection
-        self.fieldset = FieldSet.from_netcdf(
+        self.fieldset = parcels.FieldSet.from_netcdf(
             filenames, variables, dimensions, mesh=mesh, deferred_load=False
         )
 
@@ -65,7 +65,7 @@ class LagrangeFilter(object):
         # create the particle class and kernel for sampling
         self.particleclass = ParticleFactory(self.sample_fields)
         self.create_sample_kernel()
-        self.kernel = AdvectionRK4 + self.sample_kernel
+        self.kernel = parcels.AdvectionRK4 + self.sample_kernel
 
     def create_sample_kernel(self):
         """Create the parcels kernel for sampling fields during advection."""
@@ -81,7 +81,7 @@ class LagrangeFilter(object):
             f_str += "\tpass"
 
         # create the kernel
-        self.sample_kernel = Kernel(
+        self.sample_kernel = parcels.Kernel(
             self.fieldset,
             self.particleclass.getPType(),
             funcname="sample_kernel",
@@ -97,7 +97,7 @@ class LagrangeFilter(object):
             self.fieldset.gridset.grids[0].lon, self.fieldset.gridset.grids[0].lat
         )
 
-        return ParticleSet(
+        return parcels.ParticleSet(
             self.fieldset, pclass=self.particleclass, lon=lon, lat=lat, time=time
         )
 
