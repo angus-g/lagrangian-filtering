@@ -98,7 +98,7 @@ class LagrangeFilter(object):
         )
 
         return ParticleSet(
-            self.fieldset, pclass=JITParticle, lon=lon, lat=lat, time=time
+            self.fieldset, pclass=self.particleclass, lon=lon, lat=lat, time=time
         )
 
     def filter_step(self, time_index, time):
