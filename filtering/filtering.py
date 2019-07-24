@@ -12,7 +12,7 @@ class LagrangeParticleFile(object):
     All variables that are marked "to_write" are written to a temporary HDF5 file.
     """
 
-    def __init__(self, particleset, outputdt=np.infty):
+    def __init__(self, particleset, outputdt=np.infty, variables=None):
         self.outputdt = outputdt
 
         self.n = len(particleset)
@@ -22,7 +22,13 @@ class LagrangeParticleFile(object):
 
         self.var_datasets = {}
         for v in particleset.ptype.variables:
+            # this variable isn't marked for output to file -- honour that
             if not v.to_write:
+                continue
+
+            # there's an explicit list of variables for us to write, so
+            # filter based on that (e.g. outputting only sample_variables)
+            if variables is not None and v.name not in variables:
                 continue
 
             self.var_datasets[v.name] = self.h5file.create_dataset(
@@ -165,7 +171,9 @@ class LagrangeFilter(object):
 
         # seed all particles at gridpoints and advect forwards
         ps = self.particleset(time)
-        outfile_forward = LagrangeParticleFile(ps, self.output_dt)
+        outfile_forward = LagrangeParticleFile(
+            ps, self.output_dt, self.sample_variables
+        )
         ps.execute(
             self.kernel,
             runtime=self.window_size,
@@ -178,7 +186,9 @@ class LagrangeFilter(object):
 
         # reseed particles, but advect backwards (using negative dt)
         ps = self.particleset(time)
-        outfile_backward = LagrangeParticleFile(ps, self.output_dt)
+        outfile_backward = LagrangeParticleFile(
+            ps, self.output_dt, self.sample_variables
+        )
         ps.execute(
             self.kernel,
             runtime=self.window_size,
