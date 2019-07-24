@@ -1,6 +1,55 @@
 import numpy as np
 from datetime import timedelta
+import h5py
 import parcels
+import tempfile
+
+
+class LagrangeParticleFile(object):
+    """A specialised ParticleFile class for efficient input/output of
+    temporary particle data.
+
+    All variables that are marked "to_write" are written to a temporary HDF5 file.
+    """
+
+    def __init__(self, particleset, outputdt=np.infty):
+        self.outputdt = outputdt
+
+        self.n = len(particleset)
+
+        self._tempfile = tempfile.NamedTemporaryFile(dir=".", suffix=".h5")
+        self.h5file = h5py.File(self._tempfile)
+
+        self.var_datasets = {}
+        for v in particleset.ptype.variables:
+            if not v.to_write:
+                continue
+
+            self.var_datasets[v.name] = self.h5file.create_dataset(
+                v.name, (0, self.n), maxshape=(None, self.n), dtype=v.dtype
+            )
+
+    def write(self, particleset, time, deleted_only=False):
+        """Write particle data in the particleset at time to this ParticleFile's temporary dataset."""
+
+        # don't write out deleted particles
+        if deleted_only:
+            return
+
+        for v, d in self.var_datasets.items():
+            # first, resize all datasets to add another entry in the time dimension
+            d.resize(d.shape[0] + 1, axis=0)
+
+            # allocate enough space for all particles' data
+            arr = np.empty(self.n)
+            # special case: set ids to -1 ahead of time so we can tell when particle data is deleted
+            if v == "id":
+                arr[:] = -1
+
+            for p in particleset:
+                arr[p.id] = getattr(p, v)
+
+            d[-1, :] = arr
 
 
 def ParticleFactory(variables, name="SamplingParticle", BaseClass=parcels.JITParticle):
@@ -114,9 +163,7 @@ class LagrangeFilter(object):
 
         # seed all particles at gridpoints and advect forwards
         ps = self.particleset(time)
-        outfile_forward = ps.ParticleFile(
-            "{}_{}_forward".format(self.name, time_index), outputdt=self.output_dt
-        )
+        outfile_forward = LagrangeParticleFile(ps, self.output_dt)
         ps.execute(
             self.kernel,
             runtime=self.window_size,
@@ -129,9 +176,7 @@ class LagrangeFilter(object):
 
         # reseed particles, but advect backwards (using negative dt)
         ps = self.particleset(time)
-        outfile_backward = ps.ParticleFile(
-            "{}_{}_backward".format(self.name, time_index), outputdt=self.output_dt
-        )
+        outfile_backward = LagrangeParticleFile(ps, self.output_dt)
         ps.execute(
             self.kernel,
             runtime=self.window_size,
@@ -141,11 +186,6 @@ class LagrangeFilter(object):
                 parcels.ErrorCode.ErrorOutOfBounds: recovery_kernel_out_of_bounds
             },
         )
-
-        # filter data from output files and write back this timestep
-        # first, tell the output files to not automatically export to netcdf
-        outfile_forward.to_export = False
-        outfile_backward.to_export = False
 
     def __call__(self, times=None):
         """Run the filtering process on this experiment."""
