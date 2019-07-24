@@ -114,10 +114,12 @@ class LagrangeFilter(object):
         # timestep for advection
         self.advection_dt = advection_dt
 
-        # map sampled variables to fields
-        self.sample_fields = {v: getattr(self.fieldset, v) for v in sample_variables}
+        self.sample_variables = sample_variables
         # create the particle class and kernel for sampling
-        self.particleclass = ParticleFactory(self.sample_fields)
+        # map sampled variables to fields
+        self.particleclass = ParticleFactory(
+            {v: getattr(self.fieldset, v) for v in sample_variables}
+        )
         self.create_sample_kernel()
         self.kernel = parcels.AdvectionRK4 + self.sample_kernel
 
@@ -129,7 +131,7 @@ class LagrangeFilter(object):
 
         # string for the kernel itself
         f_str = "def sample_kernel(particle, fieldset, time):\n"
-        for v in self.sample_fields.keys():
+        for v in self.sample_variables:
             f_str += f"\tparticle.var_{v} = fieldset.{v}[time, particle.depth, particle.lat, particle.lon]\n"
         else:
             f_str += "\tpass"
