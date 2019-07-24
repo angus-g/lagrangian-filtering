@@ -53,10 +53,9 @@ class LagrangeFilter(object):
         # Whether we're permitted to use uneven windows on either side
         self.uneven_window = uneven_window
 
-        # construct the OceanParcels FieldSet
-        # to use for particle advection
+        # construct the OceanParcels FieldSet to use for particle advection
         self.fieldset = parcels.FieldSet.from_netcdf(
-            filenames, variables, dimensions, mesh=mesh, deferred_load=False
+            filenames, variables, dimensions, mesh=mesh
         )
 
         # guess the output timestep
