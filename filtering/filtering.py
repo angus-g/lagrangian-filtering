@@ -102,6 +102,9 @@ class LagrangeFilter(object):
             self.fieldset.gridset.grids[0].lon, self.fieldset.gridset.grids[0].lat
         )
 
+        # reset the global particle ID counter so we can rely on particle IDs making sense
+        parcels.particle.lastID = 0
+
         return parcels.ParticleSet(
             self.fieldset, pclass=self.particleclass, lon=lon, lat=lat, time=time
         )
