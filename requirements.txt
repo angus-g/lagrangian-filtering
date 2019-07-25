@@ -1,1 +1,5 @@
+dask[array]
+h5py
+numpy
+scipy
 -e git+https://github.com/angus-g/parcels@lagrangian-filtering
