@@ -1,8 +1,10 @@
+import dask.array as da
 import numpy as np
 from datetime import timedelta
 import h5py
 import parcels
 import tempfile
+from scipy import signal
 
 
 class LagrangeParticleFile(object):
@@ -119,6 +121,10 @@ class LagrangeFilter(object):
         times = self.fieldset.gridset.grids[0].time
         self.output_dt = times[1] - times[0]
 
+        # create the filter - use a 4th order Butterworth for the moment
+        fs = 1.0 / self.output_dt
+        self.inertial_filter = signal.butter(4, highpass_frequency, "highpass", fs=fs)
+
         # timestep for advection
         self.advection_dt = advection_dt
 
@@ -216,6 +222,49 @@ class LagrangeFilter(object):
             },
         )
 
+        da_out = {}
+
+        # stitch together and filter all sample variables from the temporary
+        # output data
+        for v in self.sample_variables:
+            # load data lazily as dask arrays, for forward and backward segments
+            var_array_forward = da.from_array(
+                outfile_forward.h5file[v], chunks=(None, "auto")
+            )
+            var_array_backward = da.from_array(
+                outfile_backward.h5file[v], chunks=(None, "auto")
+            )
+
+            # get an index into the middle of the array
+            time_index_data = var_array_backward.shape[0]
+
+            # construct proper sequence by concatenating data and flipping the backward segment
+            # for var_array_forward, skip the initial output for both the sample-only and
+            # sample-advection kernels, which have meaningless data
+            var_array = da.concatenate(
+                (da.flip(var_array_backward[1:, :], axis=0), var_array_forward)
+            )
+
+            def filter_select(x):
+                return signal.filtfilt(*self.inertial_filter, x)[time_index_data]
+
+            # apply scipy filter as a ufunc
+            # mapping an array to scalar over the first axis, automatically vectorize execution
+            # and allow rechunking (since we have a chunk boundary across the first axis)
+            filtered = da.apply_gufunc(
+                filter_select,
+                "(i)->()",
+                var_array,
+                axis=0,
+                vectorize=True,
+                output_dtypes=var_array.dtype,
+                allow_rechunk=True,
+            )
+
+            da_out[v] = filtered
+
+        return da_out
+
     def __call__(self, times=None):
         """Run the filtering process on this experiment."""
 
@@ -232,6 +281,14 @@ class LagrangeFilter(object):
         window_right = times <= times[-1] - self.window_size
         times = times[window_left & window_right]
 
+        da_out = {v: [] for v in self.sample_variables}
+
         # do the filtering at each timestep
         for idx, time in enumerate(times):
-            self.filter_step(idx, time)
+            # returns a dictionary of sample_variable -> dask array
+            filtered = self.filter_step(idx, time)
+            for v, a in filtered.items():
+                da_out[v].append(a)
+
+        # dump all to disk
+        da.to_hdf5(self.name + ".h5", {v: da.stack(a) for v, a in da_out.items()})
