@@ -70,10 +70,7 @@ def ParticleFactory(variables, name="SamplingParticle", BaseClass=parcels.JITPar
     the initial value of the variable should be sampled. The variable
     attributes on the Particle class are prepended by 'var_'."""
 
-    var_dict = {
-        "var_" + v: parcels.Variable("var_" + v, initial=f)
-        for v, f in variables.items()
-    }
+    var_dict = {"var_" + v: parcels.Variable("var_" + v) for v, f in variables.items()}
 
     newclass = type(name, (BaseClass,), var_dict)
     return newclass
@@ -176,11 +173,23 @@ class LagrangeFilter(object):
     def filter_step(self, time_index, time):
         """Perform forward-backward advection at a single timestep."""
 
-        # seed all particles at gridpoints and advect forwards
+        # seed all particles at gridpoints
         ps = self.particleset(time)
+        # set up the temporary output file for the initial condition and
+        # forward advection
         outfile_forward = LagrangeParticleFile(
             ps, self.output_dt, self.sample_variables
         )
+        # execute the sample-only kernel to efficiently grab the initial condition
+        ps.execute(self.sample_kernel, runtime=0, dt=self.advection_dt)
+        # if sampled data is on the same grid as e.g. velocity data, but velocities aren't
+        # sampled, parcels will incorrectly think they're already loaded
+        # reset all the chunk loading state for velocities so the advection kernel
+        # works correctly
+        self.fieldset.U.grid.load_chunk = []
+        self.fieldset.V.grid.load_chunk = []
+
+        # now the forward advection kernel can run
         ps.execute(
             self.kernel,
             runtime=self.window_size,
@@ -191,7 +200,8 @@ class LagrangeFilter(object):
             },
         )
 
-        # reseed particles, but advect backwards (using negative dt)
+        # reseed particles back on the grid, then advect backwards
+        # we don't need any initial condition sampling since we've already done it
         ps = self.particleset(time)
         outfile_backward = LagrangeParticleFile(
             ps, self.output_dt, self.sample_variables
