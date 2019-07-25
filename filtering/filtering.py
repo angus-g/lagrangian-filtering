@@ -35,12 +35,17 @@ class LagrangeParticleFile(object):
                 v.name, (0, self.n), maxshape=(None, self.n), dtype=v.dtype
             )
 
+        # create empty time attribute
+        self.h5file.attrs["time"] = []
+
     def write(self, particleset, time, deleted_only=False):
         """Write particle data in the particleset at time to this ParticleFile's temporary dataset."""
 
         # don't write out deleted particles
         if deleted_only:
             return
+
+        self.h5file.attrs["time"] = np.append(self.h5file.attrs["time"], time)
 
         for v, d in self.var_datasets.items():
             # first, resize all datasets to add another entry in the time dimension
