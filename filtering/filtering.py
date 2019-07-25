@@ -139,6 +139,13 @@ class LagrangeFilter(object):
         self.create_sample_kernel(sample_variables)
         self.kernel = parcels.AdvectionRK4 + self.sample_kernel
 
+        # compile kernels
+        self.sample_kernel.compile(compiler=parcels.compiler.GNUCompiler())
+        self.sample_kernel.load_lib()
+
+        self.kernel.compile(compiler=parcels.compiler.GNUCompiler())
+        self.kernel.load_lib()
+
     def create_sample_kernel(self, sample_variables):
         """Create the parcels kernel for sampling fields during advection."""
 
@@ -187,6 +194,7 @@ class LagrangeFilter(object):
             ps, self.output_dt, self.sample_variables
         )
         # execute the sample-only kernel to efficiently grab the initial condition
+        ps.kernel = self.sample_kernel
         ps.execute(self.sample_kernel, runtime=0, dt=self.advection_dt)
         # if sampled data is on the same grid as e.g. velocity data, but velocities aren't
         # sampled, parcels will incorrectly think they're already loaded
@@ -196,6 +204,7 @@ class LagrangeFilter(object):
         self.fieldset.V.grid.load_chunk = []
 
         # now the forward advection kernel can run
+        ps.kernel = self.kernel
         ps.execute(
             self.kernel,
             runtime=self.window_size,
@@ -212,6 +221,7 @@ class LagrangeFilter(object):
         outfile_backward = LagrangeParticleFile(
             ps, self.output_dt, self.sample_variables
         )
+        ps.kernel = self.kernel
         ps.execute(
             self.kernel,
             runtime=self.window_size,
