@@ -51,18 +51,9 @@ class LagrangeParticleFile(object):
 
         for v, d in self.var_datasets.items():
             # first, resize all datasets to add another entry in the time dimension
+            # then we can just pull the array for this variable out of the particleset
             d.resize(d.shape[0] + 1, axis=0)
-
-            # allocate enough space for all particles' data
-            arr = np.empty(self.n)
-            # special case: set ids to -1 ahead of time so we can tell when particle data is deleted
-            if v == "id":
-                arr[:] = -1
-
-            for p in particleset:
-                arr[p.id] = getattr(p, v)
-
-            d[-1, :] = arr
+            d[-1, :] = particleset.particle_data[v]
 
 
 def ParticleFactory(variables, name="SamplingParticle", BaseClass=parcels.JITParticle):
