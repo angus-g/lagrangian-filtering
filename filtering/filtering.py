@@ -87,6 +87,7 @@ class LagrangeFilter(object):
         dimensions,
         sample_variables,
         mesh="flat",
+        indices=None,
         uneven_window=False,
         window_size=None,
         highpass_frequency=5e-5,
@@ -105,7 +106,7 @@ class LagrangeFilter(object):
 
         # construct the OceanParcels FieldSet to use for particle advection
         self.fieldset = parcels.FieldSet.from_netcdf(
-            filenames, variables, dimensions, mesh=mesh
+            filenames, variables, dimensions, indices=indices, mesh=mesh
         )
 
         # guess the output timestep

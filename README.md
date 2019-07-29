@@ -62,3 +62,26 @@ This uses velocity data from the two specified files. Zonal velocity
 data from the `U` variable will be sampled and filtered, with a
 filtering window for 2 days on either side of each sample (i.e. a
 4-day window for filtering).
+
+### 3D input data
+For 3D input data (i.e. with a Z dimension), there are a couple of
+options. Running the filtering as the example above will load only the
+first Z slice (likely the surface). For more precise control of the Z
+dimension, modify the `dimensions` dictionary, and specify the level
+to load in the `indices` dictionary. For example, to load only the
+21st Z slice:
+
+```python
+dimensions = {"lon": "X", "lat": "Y", "time": "T", "depth", "Z"}
+indices = {"depth": [20]}
+
+f = filtering.LagrangeFilter(
+	... # other parameters as normal
+	indices=indices,
+	... # any other keyword parameters
+)
+```
+
+Beware that specifyng the `depth` dimension without restricting its
+indices will load data through full depth, however particles will only
+be seeded at the top. This would be a huge expense for no gain!
