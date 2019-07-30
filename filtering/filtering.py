@@ -199,7 +199,7 @@ class LagrangeFilter(object):
             )
 
             def filter_select(x):
-                return signal.filtfilt(*self.inertial_filter, x)[time_index_data]
+                return signal.filtfilt(*self.inertial_filter, x)[..., time_index_data]
 
             # apply scipy filter as a ufunc
             # mapping an array to scalar over the first axis, automatically vectorize execution
@@ -209,7 +209,6 @@ class LagrangeFilter(object):
                 "(i)->()",
                 var_array,
                 axis=0,
-                vectorize=True,
                 output_dtypes=var_array.dtype,
                 allow_rechunk=True,
             )
