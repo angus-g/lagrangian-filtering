@@ -135,11 +135,8 @@ class LagrangeFilter(object):
         self.kernel = parcels.AdvectionRK4 + self.sample_kernel
 
         # compile kernels
-        self.sample_kernel.compile(compiler=parcels.compiler.GNUCompiler())
-        self.sample_kernel.load_lib()
-
-        self.kernel.compile(compiler=parcels.compiler.GNUCompiler())
-        self.kernel.load_lib()
+        self._compile(self.sample_kernel)
+        self._compile(self.kernel)
 
     def _create_sample_kernel(self, sample_variables):
         """Create the parcels kernel for sampling fields during advection."""
@@ -162,6 +159,45 @@ class LagrangeFilter(object):
             funcvars=["particle", "fieldset", "time"],
             funccode=f_str,
         )
+
+    def _compile(self, kernel):
+        """Compile a kernel and tell it to load the resulting shared library."""
+
+        kernel.compile(compiler=parcels.compiler.GNUCompiler())
+        kernel.load_lib()
+
+    def make_zonally_periodic(self):
+        """Mark the domain as zonally periodic.
+
+        This will add a halo to the eastern and western edges of the
+        domain, so that they may cross over during advection without
+        being marked out of bounds. If a particle ends up within the
+        halo after advection, it is reset to the valid portion of the
+        domain.
+        """
+
+        # add constants that are accessible within the kernel denoting the
+        # edges of the halo region
+        self.fieldset.add_constant("halo_west", self.fieldset.gridset.grids[0].lon[0])
+        self.fieldset.add_constant("halo_east", self.fieldset.gridset.grids[0].lon[-1])
+
+        self.fieldset.add_periodic_halo(zonal=True)
+
+        # unload the advection-only kernel, and add the periodic-reset kernel
+        self.kernel.remove_lib()
+
+        def periodicBC(particle, fieldset, time):
+            if particle.lon < fieldset.halo_west:
+                particle.lon += fieldset.halo_east - fieldset.halo_west
+            elif particle.lon > fieldset.halo_east:
+                particle.lon -= fieldset.halo_east - fieldset.halo_west
+
+        periodic_kernel = parcels.Kernel(
+            self.fieldset, self.particleclass.getPType(), periodicBC
+        )
+
+        self.kernel = parcels.AdvectionRK4 + periodic_kernel + self.sample_kernel
+        self._compile(self.kernel)
 
     def particleset(self, time):
         """Create a ParticleSet initialised at the given time.
