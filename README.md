@@ -19,10 +19,11 @@ package manager. Optionally, the package can be installed inside a
 native Python environment. [Conda](https://conda.io) support is
 planned, but not yet present. There are very few dependencies, but a
 custom branch of OceanParcels is necessary to get acceptable
-performance at the moment. During the development phase, I recommend
-installing this as a "development package", meaning that changes to
-your local checkout are instantly reflected in your Python
-environment.
+performance at the moment, and the GCC compiler with OpenMP support is
+also required to compile the runtime kernels. During the development
+phase, I recommend installing this as a "development package", meaning
+that changes to your local checkout are instantly reflected in your
+Python environment.
 
 1. Clone this repository `git clone https://github.com/angus-g/lagrangian-filtering`
 2. Change to the directory `cd lagrangian-filtering`
