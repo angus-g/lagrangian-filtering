@@ -222,16 +222,17 @@ class LagrangeFilter(object):
         """Run the filtering process on this experiment."""
 
         # run over the full range of valid time indices unless specified otherwise
+        tgrid = self.fieldset.gridset.grids[0].time
         if times is None:
-            times = self.fieldset.gridset.grids[0].time
+            times = tgrid.copy()
 
             if self.uneven_window:
                 raise NotImplementedError("uneven windows aren't supported")
 
         # restrict to period covered by window
         times = np.array(times)
-        window_left = times - times[0] >= self.window_size
-        window_right = times <= times[-1] - self.window_size
+        window_left = times - tgrid[0] >= self.window_size
+        window_right = times <= tgrid[-1] - self.window_size
         times = times[window_left & window_right]
 
         da_out = {v: [] for v in self.sample_variables}
