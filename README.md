@@ -34,7 +34,12 @@ Python environment.
 ### Upgrading
 With the package installed in development mode, updating is as easy as
 `git pull` (or making local changes) in the `lagrangian-filtering`
-directory.
+directory. If changes are made to the underlying OceanParcels package,
+re-install the prerequisites with `pip install -r
+requirements.txt`. You should see a message about running `git` in the
+output. Failing that, you may manually change to the `src/parcels`
+directory within your pip directory, or your virtualenv, and run `git
+pull` as usual.
 
 ## Usage
 For the moment, it's easiest to set up the filtering workflow in a script or
