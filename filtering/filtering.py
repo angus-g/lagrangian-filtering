@@ -131,28 +131,22 @@ class LagrangeFilter(object):
 
         # seed all particles at gridpoints
         ps = self.particleset(time)
-        # set up the temporary output file for the initial condition and
-        # forward advection
-        outfile_forward = LagrangeParticleFile(
-            ps, self.output_dt, self.sample_variables
-        )
         # execute the sample-only kernel to efficiently grab the initial condition
         ps.kernel = self.sample_kernel
         ps.execute(self.sample_kernel, runtime=0, dt=self.advection_dt)
-        # if sampled data is on the same grid as e.g. velocity data, but velocities aren't
-        # sampled, parcels will incorrectly think they're already loaded
-        # reset all the chunk loading state for velocities so the advection kernel
-        # works correctly
-        self.fieldset.U.grid.load_chunk = []
-        self.fieldset.V.grid.load_chunk = []
+
+        # set up the temporary output file for the initial condition and
+        # forward advection
+        outfile = LagrangeParticleFile(ps, self.output_dt, self.sample_variables)
 
         # now the forward advection kernel can run
+        outfile.set_group("forward")
         ps.kernel = self.kernel
         ps.execute(
             self.kernel,
             runtime=self.window_size,
             dt=self.advection_dt,
-            output_file=outfile_forward,
+            output_file=outfile,
             recovery={
                 parcels.ErrorCode.ErrorOutOfBounds: recovery_kernel_out_of_bounds
             },
@@ -160,32 +154,29 @@ class LagrangeFilter(object):
 
         # reseed particles back on the grid, then advect backwards
         # we don't need any initial condition sampling since we've already done it
+        outfile.set_group("backward")
         ps = self.particleset(time)
-        outfile_backward = LagrangeParticleFile(
-            ps, self.output_dt, self.sample_variables
-        )
         ps.kernel = self.kernel
         ps.execute(
             self.kernel,
             runtime=self.window_size,
             dt=-self.advection_dt,
-            output_file=outfile_backward,
+            output_file=outfile,
             recovery={
                 parcels.ErrorCode.ErrorOutOfBounds: recovery_kernel_out_of_bounds
             },
         )
 
-        da_out = {}
-
         # stitch together and filter all sample variables from the temporary
         # output data
+        da_out = {}
         for v in self.sample_variables:
             # load data lazily as dask arrays, for forward and backward segments
             var_array_forward = da.from_array(
-                outfile_forward.h5file[v], chunks=(None, "auto")
+                outfile.data("forward")[v], chunks=(None, "auto")
             )
             var_array_backward = da.from_array(
-                outfile_backward.h5file[v], chunks=(None, "auto")
+                outfile.data("backward")[v], chunks=(None, "auto")
             )
 
             # get an index into the middle of the array
@@ -213,7 +204,7 @@ class LagrangeFilter(object):
                 allow_rechunk=True,
             )
 
-            da_out[v] = filtered
+            da_out[v] = filtered.compute()
 
         return da_out
 
