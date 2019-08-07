@@ -12,6 +12,8 @@ import numpy as np
 from datetime import timedelta
 import parcels
 from scipy import signal
+import netCDF4
+import xarray as xr
 
 from .file import LagrangeParticleFile
 
@@ -98,7 +100,7 @@ class LagrangeFilter(object):
         sample_variables,
         mesh="flat",
         c_grid=False,
-        indices=None,
+        indices={},
         uneven_window=False,
         window_size=None,
         highpass_frequency=5e-5,
@@ -114,6 +116,14 @@ class LagrangeFilter(object):
             self.window_size = window_size
         # Whether we're permitted to use uneven windows on either side
         self.uneven_window = uneven_window
+
+        # copy input file dictionaries so we can construct the output file
+        self._filenames = filenames
+        self._variables = variables
+        self._dimensions = dimensions
+        self._indices = indices
+        # sample variables without the "var_" prefix
+        self._sample_variables = sample_variables
 
         # parcels uses a separate method, even though it's just changing the
         # interpolation method on velocity variables
@@ -525,6 +535,65 @@ class LagrangeFilter(object):
 
         self(*args, **kwargs)
 
+    def create_out(self):
+        """Create a netCDF dataset to hold filtered output.
+
+        Here we create a new ``netCDF4.Dataset`` for filtered
+        output. For each sampled variable in the input files, a
+        corresponding variable in created in the output file, with
+        the same dimensions.
+
+        Returns:
+            netCDF4.Dataset: A single dataset that will hold all
+                filtered output.
+
+        """
+
+        # index dictionary referring to variables in the source files
+        indices = {self._dimensions[v]: ind for v, ind in self._indices.items()}
+
+        # the output dataset we're creating
+        ds = netCDF4.Dataset(self.name + ".nc", "w")
+
+        # create a time dimension
+        dim_time = self._dimensions["time"]
+        ds.createDimension(dim_time)
+
+        # open all input files as a single dataset
+        ds_orig = xr.merge(
+            [
+                xr.open_dataset(f)[self._variables.get(v, v)]
+                for v, f in self._filenames.items()
+            ]
+        )
+        ds_orig = ds_orig.isel(**indices).squeeze()
+
+        for v in self._sample_variables:
+            # translate if required
+            v_orig = v
+            if v in self._variables:
+                v_orig = self._variables[v]
+
+            # for each non-time dimension, create it if it doesn't already exist
+            # in the output file
+            for d in ["lat", "lon"]:
+                d = self._dimensions[d]
+                if d in ds.dimensions:
+                    continue
+
+                ds.createDimension(d, ds_orig[d].size)
+                ds.createVariable(d, ds_orig[d].dtype, dimensions=(d,))
+                ds.variables[d][:] = ds_orig[d]
+
+            # create the variable in the dataset itself
+            ds.createVariable(
+                "var_" + v,
+                "float32",
+                dimensions=(dim_time, self._dimensions["lat"], self._dimensions["lon"]),
+            )
+
+        return ds
+
     def __call__(self, times=None):
         """Run the filtering process on this experiment."""
 
@@ -542,17 +611,16 @@ class LagrangeFilter(object):
         window_right = times <= tgrid[-1] - self.window_size
         times = times[window_left & window_right]
 
-        da_out = {v: [] for v in self.sample_variables}
+        ds = self.create_out()
 
         # do the filtering at each timestep
         for idx, time in enumerate(times):
             # returns a dictionary of sample_variable -> dask array
             filtered = self.filter_step(self.advection_step(time))
             for v, a in filtered.items():
-                da_out[v].append(a)
+                ds[v][idx, ...] = a
 
-        # dump all to disk
-        da.to_hdf5(self.name + ".h5", {v: da.stack(a) for v, a in da_out.items()})
+        ds.close()
 
 
 def ParticleFactory(variables, name="SamplingParticle", BaseClass=parcels.JITParticle):
