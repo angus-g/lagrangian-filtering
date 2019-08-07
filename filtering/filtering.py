@@ -113,6 +113,16 @@ class LagrangeFilter(object):
         self.fieldset = parcels.FieldSet.from_netcdf(
             filenames, variables, dimensions, indices=indices, mesh=mesh
         )
+        # save the lon/lat on which to seed particles
+        # we make the assumption that the grid is rectilinear -- else we can just
+        # use the raw grids directly
+        # this is saved here because if the grid is later made periodic, the
+        # underlying grids will be modified, and we'll seed particles in the halos
+        self._grid_lon, self._grid_lat = np.meshgrid(
+            self.fieldset.gridset.grids[0].lon, self.fieldset.gridset.grids[0].lat
+        )
+        # starts off non-periodic
+        self._is_periodic = False
 
         # guess the output timestep
         times = self.fieldset.gridset.grids[0].time
@@ -174,7 +184,20 @@ class LagrangeFilter(object):
         being marked out of bounds. If a particle ends up within the
         halo after advection, it is reset to the valid portion of the
         domain.
+
+        If the domain has already been marked as zonally periodic,
+        nothing happens.
+
+        Note:
+            This causes the kernel to be recompiled to add another stage
+            which resets particles that end up in the halo to the main
+            domain.
+
         """
+
+        # make sure we can't do this twice
+        if self._is_periodic:
+            return
 
         # add constants that are accessible within the kernel denoting the
         # edges of the halo region
@@ -199,6 +222,8 @@ class LagrangeFilter(object):
         self.kernel = parcels.AdvectionRK4 + periodic_kernel + self.sample_kernel
         self._compile(self.kernel)
 
+        self._is_periodic = True
+
     def particleset(self, time):
         """Create a ParticleSet initialised at the given time.
 
@@ -212,16 +237,15 @@ class LagrangeFilter(object):
 
         """
 
-        # we make the assumption that the grid is rectilinear for the moment
-        lon, lat = np.meshgrid(
-            self.fieldset.gridset.grids[0].lon, self.fieldset.gridset.grids[0].lat
-        )
-
         # reset the global particle ID counter so we can rely on particle IDs making sense
         parcels.particle.lastID = 0
 
         return parcels.ParticleSet(
-            self.fieldset, pclass=self.particleclass, lon=lon, lat=lat, time=time
+            self.fieldset,
+            pclass=self.particleclass,
+            lon=self._grid_lon,
+            lat=self._grid_lat,
+            time=time,
         )
 
     def advection_step(self, time):
