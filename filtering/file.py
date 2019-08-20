@@ -1,6 +1,7 @@
 import numpy as np
 import h5py
 import tempfile
+from parcels import ErrorCode
 
 
 class LagrangeParticleFile(object):
@@ -64,7 +65,14 @@ class LagrangeParticleFile(object):
 
         self.h5file.attrs["time"] = np.append(self.h5file.attrs["time"], time)
 
+        # find particles which have been deleted
+        missing = particleset.particle_data["state"] == ErrorCode.Delete
+
         for v, d in self._var_datasets.items():
+            # set data for deleted particles to nan, so the filtered output
+            # gets a nan to mark as invalid/missing
+            particleset.particle_data[v][missing] = np.nan
+
             # first, resize all datasets to add another entry in the time dimension
             # then we can just pull the array for this variable out of the particleset
             d.resize(d.shape[0] + 1, axis=0)
