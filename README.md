@@ -13,11 +13,22 @@ stationary internal waves. At a high level, the algorithm looks like:
 4. writing filtered data back to disk
 
 ## Installation
-For the moment, the easiest way to get started is using Python's `pip`
-package manager. Optionally, the package can be installed inside a
+### Using Conda
+If you use [Conda](https://conda.io) to manage Python packages, you
+may simply run `conda install -c angus-g -c conda-forge
+lagrangian-filtering` to install this package and its required
+dependencies. You may want to constrain this to its own conda
+environment instead, with `conda create -n filtering -c angus-g -c
+conda-forge lagrangian-filtering`. The environment can be activated
+with `conda activate filtering` and deactivated with `conda
+deactivate`.
+
+### Using pip or developing
+If you don't use Conda, or are looking to develop this package, it is
+easier to get started using Python's `pip` package
+manager. Optionally, the package can be installed inside a
 `virtualenv` virtual environment, for cleaner separation from your
-native Python environment. [Conda](https://conda.io) support is
-planned, but not yet present. There are very few dependencies, but a
+native Python environment. There are very few dependencies, but a
 custom branch of OceanParcels is necessary to get acceptable
 performance at the moment, and the GCC compiler with OpenMP support is
 also required to compile the runtime kernels. During the development
@@ -31,7 +42,7 @@ Python environment.
 4. Install the prerequisites `pip install -r requirements.txt`
 5. Install the development version of the package `pip install -e .`
 
-### Upgrading
+#### Upgrading
 With the package installed in development mode, updating is as easy as
 `git pull` (or making local changes) in the `lagrangian-filtering`
 directory. If changes are made to the underlying OceanParcels package,
