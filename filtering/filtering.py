@@ -1,3 +1,12 @@
+"""The main lagrangian-filtering module.
+
+This module contains the crucial datastructure for
+lagrangian-filtering, `LagrangeFilter`. See project documentation
+for examples on how to construct a filtering workflow using this
+library.
+
+"""
+
 import dask.array as da
 import numpy as np
 from datetime import timedelta
@@ -7,27 +16,72 @@ from scipy import signal
 from .file import LagrangeParticleFile
 
 
-def ParticleFactory(variables, name="SamplingParticle", BaseClass=parcels.JITParticle):
-    """Create a Particle class that samples the specified variables.
-
-    variables is a dictionary mapping variable names to a field from which
-    the initial value of the variable should be sampled. The variable
-    attributes on the Particle class are prepended by 'var_'."""
-
-    var_dict = {"var_" + v: parcels.Variable("var_" + v) for v, f in variables.items()}
-
-    newclass = type(name, (BaseClass,), var_dict)
-    return newclass
-
-
-def recovery_kernel_out_of_bounds(particle, fieldset, time):
-    """Recovery kernel for particle advection, to delete out-of-bounds particles."""
-
-    particle.state = parcels.ErrorCode.Delete
-
-
 class LagrangeFilter(object):
-    """The main Lagrangian filter class, holds all the required state.
+    """The main class for a Lagrangian filtering workflow.
+
+    The workflow is set up using the input files and the filtering
+    parameters. Filtering can be performed all at once, or on
+    individual time levels.
+
+    Data must contain horizontal velocity components `U` and `V` to
+    perform the Lagrangian frame transformation. Any variables that should
+    be filtered must be specified in the `sample_variables` list (this
+    includes velocity).
+
+    Note:
+        We use the OceanParcels convention for variable names. This means that
+        ``U``, ``V``, ``lon``, ``lat``, ``time`` and ``depth`` are canonical
+        names for properties required for particle advection. The mapping from
+        the actual variable name in your data files to these canonical names
+        is contained in the `variables` and `dimensions` dictionaries. When
+        specifying `filenames` or `sample_variables`, the canonical names
+        must be used, however any other variables may use whatever name you
+        would like.
+
+    Once the `LagrangeFilter` has been constructed, you may call it as a
+    function to perform the filtering workflow.
+
+    Example:
+        A straightforward filtering workflow::
+
+            f = LagrangeFilter(
+                name, filenames, variables, dimensions, sample_variables,
+            )
+            f()
+
+        Would result in a new file with the given `name` and an appropriate
+        extension containing the filtered data for each of the `sample_variables`.
+
+    Args:
+        name (str): The name of the workflow
+        filenames (Dict[str, str]): A mapping from data variable names
+            to the files containing the data.
+
+            Filenames can contain globs if the data is spread across
+            multiple files.
+        variables (Dict[str, str]): A mapping from canonical variable
+            names to the variable names in your data files.
+        dimensions (Dict[str, str]): A mapping from canonical dimension
+            names to the dimension names in your data files.
+        sample_variables ([str]): A list of variable names that should be sampled
+            into the Lagrangian frame of reference and filtered.
+        mesh (:obj:`str`, optional): The OceanParcels mesh type, either "flat"
+            or "spherical".
+        indices (:obj:`Dict[str, [int]]`, optional): An optional dictionary
+            specifying the indices to which a certain dimension should
+            be restricted.
+        uneven_window (:obj:`bool`, optional): Whether to allow different
+            lengths for the forward and backward advection phases.
+        window_size (:obj:`float`, optional): The nominal length of the both
+            the forward and backward advection windows, in seconds. A
+            longer window may better capture the low-frequency signal to be
+            removed.
+        highpass_frequency (:obj:`float`, optional): The 3dB cutoff frequency
+            for filtering, below which spectral components will be attenuated.
+        advection_dt (:obj:`datetime.timedelta`, optional): The timestep
+            to use for advection. May need to be adjusted depending on the
+            resolution/frequency of your data.
+
     """
 
     def __init__(
@@ -79,7 +133,7 @@ class LagrangeFilter(object):
         self.particleclass = ParticleFactory(
             {v: getattr(self.fieldset, v) for v in sample_variables}
         )
-        self.create_sample_kernel(sample_variables)
+        self._create_sample_kernel(sample_variables)
         self.kernel = parcels.AdvectionRK4 + self.sample_kernel
 
         # compile kernels
@@ -89,7 +143,7 @@ class LagrangeFilter(object):
         self.kernel.compile(compiler=parcels.compiler.GNUCompiler())
         self.kernel.load_lib()
 
-    def create_sample_kernel(self, sample_variables):
+    def _create_sample_kernel(self, sample_variables):
         """Create the parcels kernel for sampling fields during advection."""
 
         # make sure the fieldset has C code names assigned, etc.
@@ -112,7 +166,17 @@ class LagrangeFilter(object):
         )
 
     def particleset(self, time):
-        """Create a particleset initialised at the given time."""
+        """Create a ParticleSet initialised at the given time.
+
+        Args:
+            time (float): The origin time for forward and backward advection
+                on this ParticleSet.
+
+        Returns:
+            parcels.ParticleSet: A new ParticleSet containing a single particle
+                at every gridpoint, initialised at the specified time.
+
+        """
 
         # we make the assumption that the grid is rectilinear for the moment
         lon, lat = np.meshgrid(
@@ -126,8 +190,25 @@ class LagrangeFilter(object):
             self.fieldset, pclass=self.particleclass, lon=lon, lat=lat, time=time
         )
 
-    def filter_step(self, time_index, time):
-        """Perform forward-backward advection at a single timestep."""
+    def filter_step(self, time):
+        """Perform forward-backward advection at a single point in time.
+
+        This routine is responsible for creating a new ParticleSet at the given time,
+        and performing the forward and backward advection steps in the Lagrangian
+        transformation. This transformed data is then high-pass filtered in time,
+        leaving only the signal at the origin point (i.e. the filtered forward and
+        backward advection data is discarded).
+
+        Args:
+            time (float): The point in time at which to calculate filtered data.
+
+        Returns:
+            Dict[str, dask.array]: A ditctionary mapping sampled variable
+                names to a 1D dask array containing the filtered data at the specified
+                time. This data is not lazy, as it has already been computed out
+                of the temporary advection data.
+
+        """
 
         # seed all particles at gridpoints
         ps = self.particleset(time)
@@ -148,7 +229,7 @@ class LagrangeFilter(object):
             dt=self.advection_dt,
             output_file=outfile,
             recovery={
-                parcels.ErrorCode.ErrorOutOfBounds: recovery_kernel_out_of_bounds
+                parcels.ErrorCode.ErrorOutOfBounds: _recovery_kernel_out_of_bounds
             },
         )
 
@@ -163,7 +244,7 @@ class LagrangeFilter(object):
             dt=-self.advection_dt,
             output_file=outfile,
             recovery={
-                parcels.ErrorCode.ErrorOutOfBounds: recovery_kernel_out_of_bounds
+                parcels.ErrorCode.ErrorOutOfBounds: _recovery_kernel_out_of_bounds
             },
         )
 
@@ -230,9 +311,41 @@ class LagrangeFilter(object):
         # do the filtering at each timestep
         for idx, time in enumerate(times):
             # returns a dictionary of sample_variable -> dask array
-            filtered = self.filter_step(idx, time)
+            filtered = self.filter_step(time)
             for v, a in filtered.items():
                 da_out[v].append(a)
 
         # dump all to disk
         da.to_hdf5(self.name + ".h5", {v: da.stack(a) for v, a in da_out.items()})
+
+
+def ParticleFactory(variables, name="SamplingParticle", BaseClass=parcels.JITParticle):
+    """Create a Particle class that samples the specified variables.
+
+    The variables that should be sampled will be prepended by ``var_`` as
+    class attributes, in case there are any namespace clashes with existing
+    variables on the base class.
+
+    Args:
+        variables (Dict[str, parcels.Field]): A dictionary mapping variable
+            names to a field from which the initial value of the variable
+            should be sampled.
+        name (str): The name of the generated particle class.
+        BaseClass (Type[parcels.particle._Particle]): The base particles class upon
+            which to append the required variables.
+
+    Returns:
+        Type[parcels.particle._Particle]: The new particle class
+
+    """
+
+    var_dict = {"var_" + v: parcels.Variable("var_" + v) for v in variables}
+
+    newclass = type(name, (BaseClass,), var_dict)
+    return newclass
+
+
+def _recovery_kernel_out_of_bounds(particle, fieldset, time):
+    """Recovery kernel for particle advection, to delete out-of-bounds particles."""
+
+    particle.state = parcels.ErrorCode.Delete
