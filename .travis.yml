@@ -1,0 +1,7 @@
+language: python
+cache: pip
+install:
+  - pip install black
+  - pip install -e '.'
+script:
+  - black --check --verbose .
