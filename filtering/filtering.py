@@ -130,9 +130,7 @@ class LagrangeFilter(object):
         self.sample_variables = ["var_" + v for v in sample_variables]
         # create the particle class and kernel for sampling
         # map sampled variables to fields
-        self.particleclass = ParticleFactory(
-            {v: getattr(self.fieldset, v) for v in sample_variables}
-        )
+        self.particleclass = ParticleFactory(sample_variables)
         self._create_sample_kernel(sample_variables)
         self.kernel = parcels.AdvectionRK4 + self.sample_kernel
 
@@ -327,9 +325,7 @@ def ParticleFactory(variables, name="SamplingParticle", BaseClass=parcels.JITPar
     variables on the base class.
 
     Args:
-        variables (Dict[str, parcels.Field]): A dictionary mapping variable
-            names to a field from which the initial value of the variable
-            should be sampled.
+        variables ([str]): A list of variable names which should be sampled.
         name (str): The name of the generated particle class.
         BaseClass (Type[parcels.particle._Particle]): The base particles class upon
             which to append the required variables.
