@@ -12,11 +12,9 @@ GitHub_.
 .. _OceanParcels: http://oceanparcels.org
 .. _GitHub: https://github.com/angus-g/lagrangian-filtering
 
-Documentation
--------------
-
 .. toctree::
-   :maxdepth: 2
+   :caption: Documentation
+   :maxdepth: 1
 
    installation
    algorithm
