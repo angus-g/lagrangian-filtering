@@ -1,5 +1,7 @@
 # lagrangian-filtering
-Temporal filtering of data in a Lagrangian frame of reference.
+Temporal filtering of data in a Lagrangian frame of reference. Visit the
+[documentation](https://lagrangian-filtering.readthedocs.io/en/latest/),
+or continue reading below.
 
 ## Overview
 This provides a library and a post-processing analysis tool for the
