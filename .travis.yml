@@ -2,6 +2,12 @@ language: python
 cache: pip
 install:
   - pip install black
-  - pip install -e '.'
-script:
-  - black --check --verbose .
+  - pip install -r requirements.txt
+  - pip install -e '.[build]'
+jobs:
+  include:
+    - stage: "Code Formatting"
+      script: black --check --verbose .
+    - stage: "Tests"
+      name: "Unit Tests"
+      script: pytest

@@ -7,4 +7,5 @@ setup(
     use_scm_version=True,
     setup_requires=["setuptools_scm"],
     packages=find_packages(),
+    extras_require={"build": ["pytest"]},
 )
