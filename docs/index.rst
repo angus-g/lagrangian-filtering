@@ -18,6 +18,7 @@ GitHub_.
 
    installation
    algorithm
+   contributing
    api
 
 
