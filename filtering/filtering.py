@@ -555,9 +555,12 @@ class LagrangeFilter(object):
         # the output dataset we're creating
         ds = netCDF4.Dataset(self.name + ".nc", "w")
 
-        # create a time dimension
-        dim_time = self._dimensions["time"]
-        ds.createDimension(dim_time)
+        # create a time dimension if dimensions are uniform across all variables
+        if "time" in self._dimensions:
+            dim_time = self._dimensions["time"]
+            ds.createDimension(dim_time)
+        else:
+            dim_time = None
 
         # open all input files as a single dataset
         ds_orig = xr.merge(
@@ -574,10 +577,24 @@ class LagrangeFilter(object):
             if v in self._variables:
                 v_orig = self._variables[v]
 
+            # are dimensions defined specifically for this variable?
+            if v in self._dimensions:
+                dims = self._dimensions[v]
+            else:
+                dims = self._dimensions
+
+            # create time dimension if required
+            if dim_time is None:
+                var_time = dims["time"]
+                if var_time not in ds.dimensions:
+                    ds.createDimension(var_time)
+            else:
+                var_time = dim_time
+
             # for each non-time dimension, create it if it doesn't already exist
             # in the output file
             for d in ["lat", "lon"]:
-                d = self._dimensions[d]
+                d = dims[d]
                 if d in ds.dimensions:
                     continue
 
@@ -587,9 +604,7 @@ class LagrangeFilter(object):
 
             # create the variable in the dataset itself
             ds.createVariable(
-                "var_" + v,
-                "float32",
-                dimensions=(dim_time, self._dimensions["lat"], self._dimensions["lon"]),
+                "var_" + v, "float32", dimensions=(var_time, dims["lat"], dims["lon"])
             )
 
         return ds
