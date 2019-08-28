@@ -88,7 +88,7 @@ def test_sanity_filtering_from_dataset(tmp_path):
     )
 
     # filter from the middle of the series
-    filtered = f.filter_step(t[nt // 2])["var_U"]
+    filtered = f.filter_step(f.advection_step(t[nt // 2]))["var_U"]
     # we expect a lot of parcels to hit the edge and die
     # but some should stay alive
     filtered = filtered[~np.isnan(filtered)]

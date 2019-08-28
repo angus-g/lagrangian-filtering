@@ -188,23 +188,18 @@ class LagrangeFilter(object):
             self.fieldset, pclass=self.particleclass, lon=lon, lat=lat, time=time
         )
 
-    def filter_step(self, time):
+    def advection_step(self, time):
         """Perform forward-backward advection at a single point in time.
 
-        This routine is responsible for creating a new ParticleSet at the given time,
-        and performing the forward and backward advection steps in the Lagrangian
-        transformation. This transformed data is then high-pass filtered in time,
-        leaving only the signal at the origin point (i.e. the filtered forward and
-        backward advection data is discarded).
+        This routine is responsible for creating a new ParticleSet at
+        the given time, and performing the forward and backward
+        advection steps in the Lagrangian transformation.
 
         Args:
             time (float): The point in time at which to calculate filtered data.
 
         Returns:
-            Dict[str, dask.array]: A ditctionary mapping sampled variable
-                names to a 1D dask array containing the filtered data at the specified
-                time. This data is not lazy, as it has already been computed out
-                of the temporary advection data.
+            LagrangeParticleFile: The particle file containing advection data
 
         """
 
@@ -245,6 +240,28 @@ class LagrangeFilter(object):
                 parcels.ErrorCode.ErrorOutOfBounds: _recovery_kernel_out_of_bounds
             },
         )
+
+        return outfile
+
+    def filter_step(self, outfile):
+        """Perform filtering of a single step of advection data.
+
+        The Lagrangian-transformed data from :func:`~advection_step` is
+        high-pass filtered in time, leaving only the signal at the
+        origin point (i.e. the filtered forward and backward advection
+        data is discarded).
+
+        Args:
+            outfile (LagrangeParticleFile): A particle file that has already been
+                populated by advection at a single time step.
+
+        Returns:
+            Dict[str, dask.array]: A dictionary mapping sampled variable
+                names to a 1D dask array containing the filtered data at the specified
+                time. This data is not lazy, as it has already been computed out
+                of the temporary advection data.
+
+        """
 
         # stitch together and filter all sample variables from the temporary
         # output data
@@ -309,7 +326,7 @@ class LagrangeFilter(object):
         # do the filtering at each timestep
         for idx, time in enumerate(times):
             # returns a dictionary of sample_variable -> dask array
-            filtered = self.filter_step(time)
+            filtered = self.filter_step(self.advection_step(time))
             for v, a in filtered.items():
                 da_out[v].append(a)
 
