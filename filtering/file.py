@@ -76,9 +76,6 @@ class LagrangeParticleFile(object):
 
             self._vars[v.name] = v.dtype
 
-        # create empty time attribute
-        self.h5file.attrs["time"] = []
-
     def set_group(self, group):
         """Set the group for subsequent write operations.
 
@@ -93,6 +90,9 @@ class LagrangeParticleFile(object):
         """
 
         self._group = self.h5file.require_group(group)
+        if "time" not in self._group.attrs:
+            # initialise time attribute
+            self._group.attrs["time"] = []
         self._var_datasets = {}
         for v, t in self._vars.items():
             self._var_datasets[v] = self._group.require_dataset(
@@ -143,7 +143,7 @@ class LagrangeParticleFile(object):
         if deleted_only:
             return
 
-        self.h5file.attrs["time"] = np.append(self.h5file.attrs["time"], time)
+        self._group.attrs["time"] = np.append(self._group.attrs["time"], time)
 
         # find particles which have been deleted
         missing = particleset.particle_data["state"] == ErrorCode.Delete
