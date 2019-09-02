@@ -115,6 +115,43 @@ def test_sanity_advection(tmp_path):
     assert np.array_equal(t, t_trans)
 
 
+def test_periodic_advection(tmp_path):
+    """Sanity check of advection in a periodic domain.
+
+    Because the flow in this test is purely zonal, and we set up a
+    zonally-periodic domain, we expect that all particles remain
+    alive.
+    """
+
+    nt = 37
+    w = 1 / 6
+    d, t, u = velocity_dataset(nt, w)
+    p = tmp_path / "data.nc"
+    d.to_netcdf(p)
+
+    f = filtering.LagrangeFilter(
+        "periodic_test",
+        {"U": str(p), "V": str(p)},
+        {"U": "u", "V": "v"},
+        {"lon": "x", "lat": "y", "time": "time"},
+        sample_variables=["U"],
+        mesh="flat",
+        window_size=18 * 3600,
+        highpass_frequency=(w / 2) / 3600,
+        advection_dt=60,
+    )
+
+    transformed = f.advection_step(t[nt // 2])
+    u_trans = np.concatenate(
+        (
+            transformed.data("backward")["var_U"][1:-1, 4][::-1],
+            transformed.data("forward")["var_U"][:-1, 4],
+        )
+    )
+
+    assert not np.any(np.isnan(u_trans))
+
+
 def test_sanity_filtering_from_dataset(tmp_path):
 
     """Sanity check of filtering using the library.
