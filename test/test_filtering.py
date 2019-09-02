@@ -17,6 +17,40 @@ def velocity_series(nt, U0, f):
     return t, u
 
 
+def velocity_dataset(nt, w):
+    U0 = 100 / 24
+    t, u = velocity_series(nt, U0, w)
+
+    # convert hours to seconds
+    u /= 3600
+    t *= 3600
+
+    # note:
+    # velocity data is offset from times unless times
+    # start at zero -- this shouldn't be an absolute
+    # requirement for tests (regular datasets don't
+    # necessarily begin at t=0...)
+    t -= 3600
+
+    x = np.array([0, 500, 1000])
+    y = np.array([0, 500, 1000])
+
+    # broadcast velocity to right shape
+    u_full = np.empty((nt, y.size, x.size))
+    u_full[:] = u[:, None, None]
+
+    # create dataset
+    d = xr.Dataset(
+        {
+            "u": (["time", "y", "x"], u_full),
+            "v": (["time", "y", "x"], np.zeros_like(u_full)),
+        },
+        coords={"x": x, "y": y, "time": t},
+    )
+
+    return d, t, u
+
+
 def test_sanity():
     """Sanity check of filtering.
 
@@ -37,7 +71,52 @@ def test_sanity():
     assert fu[nt // 2] == pytest.approx(0.0, abs=1e-2)
 
 
+def test_sanity_advection(tmp_path):
+    """Sanity check of advection.
+
+    Using a uniform velocity field, the particles should have the same
+    value regardless of where in the domain they go.
+    """
+
+    nt = 37
+    w = 1 / 6
+    d, t, u = velocity_dataset(nt, w)
+    p = tmp_path / "data.nc"
+    d.to_netcdf(p)
+
+    f = filtering.LagrangeFilter(
+        "advection_test",
+        {"U": str(p), "V": str(p)},
+        {"U": "u", "V": "v"},
+        {"lon": "x", "lat": "y", "time": "time"},
+        sample_variables=["U"],
+        mesh="flat",
+        window_size=18 * 3600,
+        highpass_frequency=(w / 2) / 3600,
+        advection_dt=60,
+    )
+
+    transformed = f.advection_step(t[nt // 2])
+    t_trans = np.concatenate(
+        (
+            transformed.data("backward").attrs["time"][1:-1][::-1],
+            transformed.data("forward").attrs["time"][:-1],
+        )
+    )
+
+    u_trans = np.concatenate(
+        (
+            transformed.data("backward")["var_U"][1:-1, 4][::-1],
+            transformed.data("forward")["var_U"][:-1, 4],
+        )
+    )
+
+    assert np.allclose(u, u_trans, rtol=1e-1)
+    assert np.array_equal(t, t_trans)
+
+
 def test_sanity_filtering_from_dataset(tmp_path):
+
     """Sanity check of filtering using the library.
 
     As with the :func:`~test_sanity` test, this sets up a mean
@@ -46,32 +125,9 @@ def test_sanity_filtering_from_dataset(tmp_path):
     should be the same as the 1D timeseries.
     """
 
-    U0 = 100 / 24
-    w = 1 / 6
     nt = 37
-    t, u = velocity_series(nt, U0, w)
-
-    # convert hours to seconds
-    u /= 3600
-    t *= 3600
-
-    x = np.array([0, 500, 1000])
-    y = np.array([0, 500, 1000])
-
-    # broadcast velocity to right shape
-    u_full = np.empty((nt, y.size, x.size))
-    u_full[:] = u[:, None, None]
-
-    # create dataset
-    d = xr.Dataset(
-        {
-            "u": (["time", "y", "x"], u_full),
-            "v": (["time", "y", "x"], np.zeros_like(u_full)),
-        },
-        coords={"x": x, "y": y, "time": t},
-    )
-
-    # dump to file
+    w = 1 / 6
+    d, t, _ = velocity_dataset(nt, w)
     p = tmp_path / "data.nc"
     d.to_netcdf(p)
 
@@ -82,7 +138,7 @@ def test_sanity_filtering_from_dataset(tmp_path):
         {"lon": "x", "lat": "y", "time": "time"},
         sample_variables=["U"],
         mesh="flat",
-        window_size=17 * 3600,
+        window_size=18 * 3600,
         highpass_frequency=(w / 2) / 3600,
         advection_dt=30 * 60,
     )
