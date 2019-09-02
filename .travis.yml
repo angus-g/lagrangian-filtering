@@ -11,3 +11,4 @@ jobs:
     - stage: "Tests"
       name: "Unit Tests"
       script: pytest
+      env: OMP_NUM_THREADS=1
