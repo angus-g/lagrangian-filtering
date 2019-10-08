@@ -59,7 +59,7 @@ class LagrangeParticleFile(object):
         self.n = len(particleset)
 
         self._tempfile = tempfile.NamedTemporaryFile(dir=".", suffix=".h5")
-        self.h5file = h5py.File(self._tempfile)
+        self.h5file = h5py.File(self._tempfile, "w")
 
         # variable -> dtype map for creating datasets
         self._vars = {}
