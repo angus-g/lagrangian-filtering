@@ -1,5 +1,5 @@
 dask[array]
 h5py
-numpy
+numpy>=1.17.0
 scipy>=1.2.0
 -e git+https://github.com/angus-g/parcels@lagrangian-filtering#egg=parcels
