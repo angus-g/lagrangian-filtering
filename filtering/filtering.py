@@ -78,7 +78,8 @@ class LagrangeFilter(object):
             longer window may better capture the low-frequency signal to be
             removed.
         highpass_frequency (:obj:`float`, optional): The 3dB cutoff frequency
-            for filtering, below which spectral components will be attenuated.
+            for filtering, below which spectral components will be
+            attenuated. This should be an angular frequency, in [rad/s].
         advection_dt (:obj:`datetime.timedelta`, optional): The timestep
             to use for advection. May need to be adjusted depending on the
             resolution/frequency of your data.
@@ -131,8 +132,12 @@ class LagrangeFilter(object):
         self.output_dt = times[1] - times[0]
 
         # create the filter - use a 4th order Butterworth for the moment
+        # make sure to convert angular frequency back to linear for passing to the
+        # filter constructor
         fs = 1.0 / self.output_dt
-        self.inertial_filter = signal.butter(4, highpass_frequency, "highpass", fs=fs)
+        self.inertial_filter = signal.butter(
+            4, highpass_frequency / (2 * np.pi), "highpass", fs=fs
+        )
 
         # timestep for advection
         self.advection_dt = advection_dt
