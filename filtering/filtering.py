@@ -38,8 +38,9 @@ class LagrangeFilter(object):
         must be used, however any other variables may use whatever name you
         would like.
 
-    Once the `LagrangeFilter` has been constructed, you may call it as a
-    function to perform the filtering workflow.
+    Once the `LagrangeFilter` has been constructed, you may call it as
+    a function to perform the filtering workflow. See :func:`~filter`
+    for documentation.
 
     Example:
         A straightforward filtering workflow::
@@ -438,6 +439,28 @@ class LagrangeFilter(object):
             da_out[v] = filtered.compute()
 
         return da_out
+
+    def filter(self, *args, **kwargs):
+        """Run the filtering process on this experiment.
+
+        Note:
+            Instead of `f.filter(...)`, you can call `f(...)` directly.
+
+        This is main method of the filtering workflow. The timesteps
+        to filter may either be specified manually, or determined from
+        the window size and the timesteps within the input files. In
+        this latter case, only timesteps that have the full window
+        size on either side are selected.
+
+        Args:
+            times (:obj:`[float]`, optional): A list of timesteps at
+                which to run the filtering. If this is omitted, all
+                timesteps that are fully covered by the filtering
+                window are selected.
+
+        """
+
+        self(*args, **kwargs)
 
     def __call__(self, times=None):
         """Run the filtering process on this experiment."""
