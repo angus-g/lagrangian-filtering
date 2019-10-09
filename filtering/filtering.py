@@ -122,7 +122,8 @@ class LagrangeFilter(object):
             self.fieldset.gridset.grids[0].lon, self.fieldset.gridset.grids[0].lat
         )
         # starts off non-periodic
-        self._is_periodic = False
+        self._is_zonally_periodic = False
+        self._is_meridionally_periodic = False
 
         # guess the output timestep
         times = self.fieldset.gridset.grids[0].time
@@ -176,7 +177,7 @@ class LagrangeFilter(object):
         kernel.compile(compiler=parcels.compiler.GNUCompiler())
         kernel.load_lib()
 
-    def make_zonally_periodic(self):
+    def make_zonally_periodic(self, width=None):
         """Mark the domain as zonally periodic.
 
         This will add a halo to the eastern and western edges of the
@@ -188,15 +189,26 @@ class LagrangeFilter(object):
         If the domain has already been marked as zonally periodic,
         nothing happens.
 
+        Args:
+            width (:obj:`int`, optional): The width of the halo,
+                defaults to 5 (per parcels). This needs to be less
+                than half the number of points in the grid in the x
+                direction. This may need to be adjusted for small
+                domains, or if particles are still escaping the halo.
+
         Note:
             This causes the kernel to be recompiled to add another stage
             which resets particles that end up in the halo to the main
             domain.
 
+            If the kernel has already been recompiled for meridional periodicity,
+            it is again reset to include periodicity in both
+            directions.
+
         """
 
         # make sure we can't do this twice
-        if self._is_periodic:
+        if self._is_zonally_periodic:
             return
 
         # add constants that are accessible within the kernel denoting the
@@ -204,25 +216,88 @@ class LagrangeFilter(object):
         self.fieldset.add_constant("halo_west", self.fieldset.gridset.grids[0].lon[0])
         self.fieldset.add_constant("halo_east", self.fieldset.gridset.grids[0].lon[-1])
 
-        self.fieldset.add_periodic_halo(zonal=True)
+        if width is None:
+            self.fieldset.add_periodic_halo(zonal=True)
+        else:
+            self.fieldset.add_periodic_halo(zonal=True, halosize=width)
 
         # unload the advection-only kernel, and add the periodic-reset kernel
         self.kernel.remove_lib()
 
-        def periodicBC(particle, fieldset, time):
-            if particle.lon < fieldset.halo_west:
-                particle.lon += fieldset.halo_east - fieldset.halo_west
-            elif particle.lon > fieldset.halo_east:
-                particle.lon -= fieldset.halo_east - fieldset.halo_west
+        if self._is_meridionally_periodic:
+            k = _doubly_periodic_BC
+        else:
+            k = _zonally_periodic_BC
 
         periodic_kernel = parcels.Kernel(
-            self.fieldset, self.particleclass.getPType(), periodicBC
+            self.fieldset, self.particleclass.getPType(), k
         )
 
         self.kernel = parcels.AdvectionRK4 + periodic_kernel + self.sample_kernel
         self._compile(self.kernel)
 
-        self._is_periodic = True
+        self._is_zonally_periodic = True
+
+    def make_meridionally_periodic(self, width=None):
+        """Mark the domain as meridionally periodic.
+
+        This will add a halo to the northern and southern edges of the
+        domain, so that they may cross over during advection without
+        being marked out of bounds. If a particle ends up within the
+        halo after advection, it is reset to the valid portion of the
+        domain.
+
+        If the domain has already been marked as meridionally periodic,
+        nothing happens.
+
+        Args:
+            width (:obj:`int`, optional): The width of the halo,
+                defaults to 5 (per parcels). This needs to be less
+                than half the number of points in the grid in the y
+                direction. This may need to be adjusted for small
+                domains, or if particles are still escaping the halo.
+
+        Note:
+            This causes the kernel to be recompiled to add another stage
+            which resets particles that end up in the halo to the main
+            domain.
+
+            If the kernel has already been recompiled for zonal periodicity,
+            it is again reset to include periodicity in both
+            directions.
+
+        """
+
+        # make sure we can't do this twice
+        if self._is_meridionally_periodic:
+            return
+
+        # add constants that are accessible within the kernel denoting the
+        # edges of the halo region
+        self.fieldset.add_constant("halo_north", self.fieldset.gridset.grids[0].lat[-1])
+        self.fieldset.add_constant("halo_south", self.fieldset.gridset.grids[0].lat[0])
+
+        if width is None:
+            self.fieldset.add_periodic_halo(meridional=True)
+        else:
+            self.fieldset.add_periodic_halo(meridional=True, halosize=width)
+
+        # unload the previous kernel, and add the meridionally-periodic kernel
+        self.kernel.remove_lib()
+
+        if self._is_zonally_periodic:
+            k = _doubly_periodic_BC
+        else:
+            k = _meridionally_periodic_BC
+
+        periodic_kernel = parcels.Kernel(
+            self.fieldset, self.particleclass.getPType(), k
+        )
+
+        self.kernel = parcels.AdvectionRK4 + periodic_kernel + self.sample_kernel
+        self._compile(self.kernel)
+
+        self._is_meridionally_periodic = True
 
     def particleset(self, time):
         """Create a ParticleSet initialised at the given time.
@@ -422,3 +497,32 @@ def _recovery_kernel_out_of_bounds(particle, fieldset, time):
     """Recovery kernel for particle advection, to delete out-of-bounds particles."""
 
     particle.state = parcels.ErrorCode.Delete
+
+
+def _zonally_periodic_BC(particle, fieldset, time):
+    if particle.lon < fieldset.halo_west:
+        particle.lon += fieldset.halo_east - fieldset.halo_west
+    elif particle.lon > fieldset.halo_east:
+        particle.lon -= fieldset.halo_east - fieldset.halo_west
+
+
+def _meridionally_periodic_BC(particle, fieldset, time):
+    if particle.lat < fieldset.halo_south:
+        particle.lat += fieldset.halo_north - fieldset.halo_south
+    elif particle.lat > fieldset.halo_north:
+        particle.lat -= fieldset.halo_north - fieldset.halo_south
+
+
+def _doubly_periodic_BC(particle, fieldset, time):
+    # because the kernel is run through code generation, we can't simply
+    # call the above kernels, so we unfortunately have to reproduce them
+    # in full here
+    if particle.lon < fieldset.halo_west:
+        particle.lon += fieldset.halo_east - fieldset.halo_west
+    elif particle.lon > fieldset.halo_east:
+        particle.lon -= fieldset.halo_east - fieldset.halo_west
+
+    if particle.lat < fieldset.halo_south:
+        particle.lat += fieldset.halo_north - fieldset.halo_south
+    elif particle.lat > fieldset.halo_north:
+        particle.lat -= fieldset.halo_north - fieldset.halo_south
