@@ -417,7 +417,7 @@ class LagrangeFilter(object):
             )
 
             # get an index into the middle of the array
-            time_index_data = var_array_backward.shape[0]
+            time_index_data = var_array_backward.shape[0] - 1
 
             # construct proper sequence by concatenating data and flipping the backward segment
             # for var_array_forward, skip the initial output for both the sample-only and
