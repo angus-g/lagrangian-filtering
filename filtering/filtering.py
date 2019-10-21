@@ -423,7 +423,7 @@ class LagrangeFilter(object):
             # for var_array_forward, skip the initial output for both the sample-only and
             # sample-advection kernels, which have meaningless data
             var_array = da.concatenate(
-                (da.flip(var_array_backward[1:, :], axis=0), var_array_forward)
+                (da.flip(var_array_backward[1:-1, :], axis=0), var_array_forward[:-1])
             )
 
             def filter_select(x):
