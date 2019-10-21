@@ -329,7 +329,7 @@ class LagrangeFilter(object):
             time=time,
         )
 
-    def advection_step(self, time):
+    def advection_step(self, time, output_time=False):
         """Perform forward-backward advection at a single point in time.
 
         This routine is responsible for creating a new ParticleSet at
@@ -338,9 +338,19 @@ class LagrangeFilter(object):
 
         Args:
             time (float): The point in time at which to calculate filtered data.
+            output_time (:obj:`bool`, optional): Whether to include "time" as
+                a numpy array in the output dictionary, for doing manual analysis.
+
+        Note:
+            If ``output_time`` is True, the output object will not be compatible
+            with the default filtering workflow, :func:`~filter_step`!
 
         Returns:
-            LagrangeParticleFile: The particle file containing advection data
+            Dict[str, (int, dask.array)]: A dictionary of the advection
+                data, mapping variable names to a pair. The first element is
+                the index of the sampled timestep in the data, and the
+                second element is a lazy dask array concatenating the forward
+                and backward advection data.
 
         """
 
@@ -382,28 +392,6 @@ class LagrangeFilter(object):
             },
         )
 
-        return outfile
-
-    def filter_step(self, outfile):
-        """Perform filtering of a single step of advection data.
-
-        The Lagrangian-transformed data from :func:`~advection_step` is
-        high-pass filtered in time, leaving only the signal at the
-        origin point (i.e. the filtered forward and backward advection
-        data is discarded).
-
-        Args:
-            outfile (LagrangeParticleFile): A particle file that has already been
-                populated by advection at a single time step.
-
-        Returns:
-            Dict[str, dask.array]: A dictionary mapping sampled variable
-                names to a 1D dask array containing the filtered data at the specified
-                time. This data is not lazy, as it has already been computed out
-                of the temporary advection data.
-
-        """
-
         # stitch together and filter all sample variables from the temporary
         # output data
         da_out = {}
@@ -425,6 +413,44 @@ class LagrangeFilter(object):
             var_array = da.concatenate(
                 (da.flip(var_array_backward[1:-1, :], axis=0), var_array_forward[:-1])
             )
+
+            da_out[v] = (time_index_data, var_array)
+
+        if output_time:
+            da_out["time"] = np.concatenate(
+                (
+                    outfile.data("backward").attrs["time"][1:-1][::-1],
+                    outfile.data("forward").attrs["time"][:-1],
+                )
+            )
+
+        return da_out
+
+    def filter_step(self, advection_data):
+        """Perform filtering of a single step of advection data.
+
+        The Lagrangian-transformed data from :func:`~advection_step` is
+        high-pass filtered in time, leaving only the signal at the
+        origin point (i.e. the filtered forward and backward advection
+        data is discarded).
+
+        Args:
+            advection_data (Dict[str, (int, dask.array)]): A dictionary of
+                particle advection data from a single timestep, returned
+                from :func:`~advection_step`.
+
+        Returns:
+            Dict[str, dask.array]: A dictionary mapping sampled
+                variable names to a 1D dask array containing the
+                filtered data at the specified time. This data is not
+                lazy, as it has already been computed out of the
+                temporary advection data.
+
+        """
+
+        da_out = {}
+        for v, a in advection_data.items():
+            time_index_data, var_array = a
 
             def filter_select(x):
                 return signal.filtfilt(*self.inertial_filter, x)[..., time_index_data]

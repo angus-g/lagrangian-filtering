@@ -96,20 +96,9 @@ def test_sanity_advection(tmp_path):
         advection_dt=60,
     )
 
-    transformed = f.advection_step(t[nt // 2])
-    t_trans = np.concatenate(
-        (
-            transformed.data("backward").attrs["time"][1:-1][::-1],
-            transformed.data("forward").attrs["time"][:-1],
-        )
-    )
-
-    u_trans = np.concatenate(
-        (
-            transformed.data("backward")["var_U"][1:-1, 4][::-1],
-            transformed.data("forward")["var_U"][:-1, 4],
-        )
-    )
+    transformed = f.advection_step(t[nt // 2], output_time=True)
+    t_trans = transformed["time"]
+    u_trans = transformed["var_U"][1][:, 4].compute()
 
     assert np.allclose(u, u_trans, rtol=1e-1)
     assert np.array_equal(t, t_trans)
@@ -143,12 +132,7 @@ def test_zonally_periodic_advection(tmp_path):
     f.make_zonally_periodic(width=3)
 
     transformed = f.advection_step(t[nt // 2])
-    u_trans = np.concatenate(
-        (
-            transformed.data("backward")["var_U"][1:-1, :][::-1],
-            transformed.data("forward")["var_U"][:-1, :],
-        )
-    )
+    u_trans = transformed["var_U"][1].compute()
 
     assert not np.any(np.isnan(u_trans))
 
@@ -181,12 +165,7 @@ def test_meridionally_periodic_advection(tmp_path):
     f.make_meridionally_periodic(width=3)
 
     transformed = f.advection_step(t[nt // 2])
-    v_trans = np.concatenate(
-        (
-            transformed.data("backward")["var_V"][1:-1, :][::-1],
-            transformed.data("forward")["var_V"][:-1, :],
-        )
-    )
+    v_trans = transformed["var_V"][1].compute()
 
     assert not np.any(np.isnan(v_trans))
 
@@ -219,12 +198,7 @@ def test_doubly_periodic_advection(tmp_path):
     f.make_meridionally_periodic(width=3)
 
     transformed = f.advection_step(t[nt // 2])
-    v_trans = np.concatenate(
-        (
-            transformed.data("backward")["var_V"][1:-1, :][::-1],
-            transformed.data("forward")["var_V"][:-1, :],
-        )
-    )
+    v_trans = transformed["var_V"][1].compute()
 
     assert not np.any(np.isnan(v_trans))
 
