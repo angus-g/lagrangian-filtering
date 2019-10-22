@@ -19,6 +19,7 @@ GitHub_.
    installation
    algorithm
    exploring
+   examples
    contributing
    api
 
