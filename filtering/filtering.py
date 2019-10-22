@@ -67,7 +67,10 @@ class LagrangeFilter(object):
         sample_variables ([str]): A list of variable names that should be sampled
             into the Lagrangian frame of reference and filtered.
         mesh (:obj:`str`, optional): The OceanParcels mesh type, either "flat"
-            or "spherical".
+            or "spherical". "flat" meshes are expected to have dimensions
+            in metres, and "spherical" meshes in degrees.
+        c_grid (:obj:`bool`, optional): Whether to interpolate velocity
+            components on an Arakawa C grid (defaults to no).
         indices (:obj:`Dict[str, [int]]`, optional): An optional dictionary
             specifying the indices to which a certain dimension should
             be restricted.
@@ -94,6 +97,7 @@ class LagrangeFilter(object):
         dimensions,
         sample_variables,
         mesh="flat",
+        c_grid=False,
         indices=None,
         uneven_window=False,
         window_size=None,
@@ -111,18 +115,32 @@ class LagrangeFilter(object):
         # Whether we're permitted to use uneven windows on either side
         self.uneven_window = uneven_window
 
+        # parcels uses a separate method, even though it's just changing the
+        # interpolation method on velocity variables
+        fieldset_constructor = parcels.FieldSet.from_netcdf
+        if c_grid:
+            fieldset_constructor = parcels.FieldSet.from_c_grid_dataset
+
         # construct the OceanParcels FieldSet to use for particle advection
-        self.fieldset = parcels.FieldSet.from_netcdf(
+        self.fieldset = fieldset_constructor(
             filenames, variables, dimensions, indices=indices, mesh=mesh
         )
         # save the lon/lat on which to seed particles
-        # we make the assumption that the grid is rectilinear -- else we can just
-        # use the raw grids directly
         # this is saved here because if the grid is later made periodic, the
         # underlying grids will be modified, and we'll seed particles in the halos
-        self._grid_lon, self._grid_lat = np.meshgrid(
-            self.fieldset.gridset.grids[0].lon, self.fieldset.gridset.grids[0].lat
-        )
+        if self.fieldset.gridset.grids[0].gtype in [
+            parcels.GridCode.CurvilinearZGrid,
+            parcels.GridCode.CurvilinearSGrid,
+        ]:
+            self._curvilinear = True
+            self._grid_lon = self.fieldset.gridset.grids[0].lon
+            self._grid_lat = self.fieldset.gridset.grids[0].lat
+        else:
+            self._curvilinear = False
+            self._grid_lon, self._grid_lat = np.meshgrid(
+                self.fieldset.gridset.grids[0].lon, self.fieldset.gridset.grids[0].lat
+            )
+
         # starts off non-periodic
         self._is_zonally_periodic = False
         self._is_meridionally_periodic = False
@@ -195,6 +213,9 @@ class LagrangeFilter(object):
         If the domain has already been marked as zonally periodic,
         nothing happens.
 
+        Due to the method of resetting particles that end up in the
+        halo, this is incompatible with curvilinear grids.
+
         Args:
             width (:obj:`int`, optional): The width of the halo,
                 defaults to 5 (per parcels). This needs to be less
@@ -212,6 +233,10 @@ class LagrangeFilter(object):
             directions.
 
         """
+
+        # the method of resetting particles won't work on a curvilinear grid
+        if self._curvilinear:
+            raise Exception("curvilinear grids can not be periodic")
 
         # make sure we can't do this twice
         if self._is_zonally_periodic:
@@ -256,6 +281,9 @@ class LagrangeFilter(object):
         If the domain has already been marked as meridionally periodic,
         nothing happens.
 
+        Due to the method of resetting particles that end up in the
+        halo, this is incompatible with curvilinear grids.
+
         Args:
             width (:obj:`int`, optional): The width of the halo,
                 defaults to 5 (per parcels). This needs to be less
@@ -273,6 +301,10 @@ class LagrangeFilter(object):
             directions.
 
         """
+
+        # the method of resetting particles won't work on a curvilinear grid
+        if self._curvilinear:
+            raise Exception("curvilinear grids can not be periodic")
 
         # make sure we can't do this twice
         if self._is_meridionally_periodic:
