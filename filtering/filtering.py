@@ -118,6 +118,8 @@ class LagrangeFilter(object):
         self.uneven_window = uneven_window
 
         # copy input file dictionaries so we can construct the output file
+        # filenames dictionary is modified to expand globs when
+        # the fieldset is constructed
         self._filenames = filenames
         self._variables = variables
         self._dimensions = dimensions
@@ -555,6 +557,43 @@ class LagrangeFilter(object):
         # the output dataset we're creating
         ds = netCDF4.Dataset(self.name + ".nc", "w")
 
+        # helper function to create the dimensions in the ouput file
+        def create_dimension(dims, dim, var):
+            # translate from parcels -> file convention
+            # and check whether we've already created this dimension
+            # (e.g. for a previous variable)
+            file_dim = dims[dim]
+            if file_dim in ds.variables:
+                return ds.variables[file_dim].dimensions[
+                    1
+                    if len(ds.variables[file_dim].dimensions) > 1 and dim == "lon"
+                    else 0
+                ]
+
+            # get the file containing the dimension data
+            v_orig = self._variables.get(var, var)
+            if isinstance(self._filenames[var], dict):
+                filename = self._filenames[var][dim]
+            else:
+                filename = self._filenames[var]
+
+            if isinstance(filename, list):
+                filename = filename[0]
+
+            ds_orig = xr.open_dataset(filename)[file_dim]
+
+            # create dimensions if needed
+            for d in ds_orig.dims:
+                if d not in ds.dimensions:
+                    ds.createDimension(d, ds_orig[d].size)
+
+            # create the dimension variable
+            ds.createVariable(file_dim, ds_orig.dtype, dimensions=ds_orig.dims)
+            ds.variables[file_dim][:] = ds_orig
+
+            # curvilinear grid case
+            return ds_orig.dims[1 if len(ds_orig.dims) > 1 and dim == "lon" else 0]
+
         # create a time dimension if dimensions are uniform across all variables
         if "time" in self._dimensions:
             dim_time = self._dimensions["time"]
@@ -562,20 +601,27 @@ class LagrangeFilter(object):
         else:
             dim_time = None
 
-        # open all input files as a single dataset
-        ds_orig = xr.merge(
-            [
-                xr.open_dataset(f)[self._variables.get(v, v)]
-                for v, f in self._filenames.items()
-            ]
-        )
-        ds_orig = ds_orig.isel(**indices).squeeze()
-
         for v in self._sample_variables:
-            # translate if required
-            v_orig = v
-            if v in self._variables:
-                v_orig = self._variables[v]
+            # translate if required (parcels -> file convention)
+            v_orig = self._variables.get(v, v)
+
+            # open all the relevant files for this variable
+            if isinstance(self._filenames[v], dict):
+                # variable -> dictionary (for separate coordinate filse)
+                filename = self._filenames[v]["data"]
+            else:
+                # otherwise, we just have a plain variable -> file mapping
+                filename = self._filenames[v]
+
+            # globs can give us a list, but we only need the first item
+            # to get the metadata
+            if isinstance(filename, list):
+                filename = filename[0]
+
+            # select only the relevant indices
+            # in particular, squeeze to drop z dimension if we index it out
+            ds_orig = xr.open_dataset(filename)[v_orig]
+            ds_orig = ds_orig.isel(**indices).squeeze()
 
             # are dimensions defined specifically for this variable?
             if v in self._dimensions:
@@ -583,28 +629,26 @@ class LagrangeFilter(object):
             else:
                 dims = self._dimensions
 
-            # create time dimension if required
+            # create time dimension if required (i.e. not already in the
+            # output file we've created)
+            out_dims = {}
             if dim_time is None:
-                var_time = dims["time"]
-                if var_time not in ds.dimensions:
-                    ds.createDimension(var_time)
+                out_dims["time"] = dims["time"]
+                if dims["time"] not in ds.dimensions:
+                    ds.createDimension(dims["time"])
             else:
-                var_time = dim_time
+                out_dims["time"] = dim_time
 
             # for each non-time dimension, create it if it doesn't already exist
             # in the output file
             for d in ["lat", "lon"]:
-                d = dims[d]
-                if d in ds.dimensions:
-                    continue
-
-                ds.createDimension(d, ds_orig[d].size)
-                ds.createVariable(d, ds_orig[d].dtype, dimensions=(d,))
-                ds.variables[d][:] = ds_orig[d]
+                out_dims[d] = create_dimension(dims, d, v)
 
             # create the variable in the dataset itself
             ds.createVariable(
-                "var_" + v, "float32", dimensions=(var_time, dims["lat"], dims["lon"])
+                "var_" + v,
+                "float32",
+                dimensions=(out_dims["time"], out_dims["lat"], out_dims["lon"]),
             )
 
         return ds
