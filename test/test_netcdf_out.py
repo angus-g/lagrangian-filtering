@@ -159,3 +159,39 @@ def test_staggered(tmp_path):
     d = xr.open_dataset(out)
     for n in v:
         assert f"var_{n}" in d.variables
+
+
+def test_curvilinear(tmp_path):
+    """Test creation of output file where grid is curvilinear."""
+
+    os.chdir(tmp_path)
+    p = "test.nc"
+    coords = {"xi": np.arange(5), "eta": np.arange(4), "time": np.arange(3)}
+    d = xr.Dataset(
+        {
+            "U": (["time", "eta", "xi"], np.empty((3, 4, 5))),
+            "V": (["time", "eta", "xi"], np.empty((3, 4, 5))),
+            "lat": (["eta", "xi"], np.ones((4, 5))),
+            "lon": (["eta", "xi"], 2 * np.ones((4, 5))),
+        },
+        coords=coords,
+    )
+    d.to_netcdf(p)
+
+    f = filtering.LagrangeFilter(
+        "curvilinear",
+        {"U": p, "V": p},
+        {"U": "U", "V": "V"},
+        {k: k for k in ["lon", "lat", "time"]},
+        sample_variables=["U"],
+    )
+    f.create_out().close()
+
+    out = Path("curvilinear.nc")
+    assert out.exists()
+
+    d = xr.open_dataset(out)
+    assert "var_U" in d.variables
+    assert d["var_U"].dims == ("time", "eta", "xi")
+    assert "lat" in d.variables
+    assert d["lat"].dims == ("eta", "xi")
