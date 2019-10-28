@@ -431,10 +431,10 @@ class LagrangeFilter(object):
             # load data lazily as dask arrays, for forward and backward segments
             var_array_forward = da.from_array(
                 outfile.data("forward")[v], chunks=(None, "auto")
-            )
+            )[:-1, :]
             var_array_backward = da.from_array(
                 outfile.data("backward")[v], chunks=(None, "auto")
-            )
+            )[:-1, :]
 
             # get an index into the middle of the array
             time_index_data = var_array_backward.shape[0] - 1
@@ -443,7 +443,7 @@ class LagrangeFilter(object):
             # for var_array_forward, skip the initial output for both the sample-only and
             # sample-advection kernels, which have meaningless data
             var_array = da.concatenate(
-                (da.flip(var_array_backward[1:-1, :], axis=0), var_array_forward[:-1])
+                (da.flip(var_array_backward[1:, :], axis=0), var_array_forward)
             )
 
             da_out[v] = (time_index_data, var_array)
