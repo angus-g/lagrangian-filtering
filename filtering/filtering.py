@@ -12,6 +12,7 @@ import numpy as np
 from datetime import timedelta
 import parcels
 from scipy import signal
+import xarray as xr
 
 from .file import LagrangeParticleFile
 
@@ -60,8 +61,10 @@ class LagrangeFilter(object):
 
             Filenames can contain globs if the data is spread across
             multiple files.
-        variables (Dict[str, str]): A mapping from canonical variable
-            names to the variable names in your data files.
+        variables_or_data (Union[Dict[str, str], xarray.Dataset]): Either
+            a mapping from canonical variable names to the variable
+            names in your data files, or an xarray Dataset containing
+            the input data.
         dimensions (Dict[str, str]): A mapping from canonical dimension
             names to the dimension names in your data files.
         sample_variables ([str]): A list of variable names that should be sampled
@@ -92,7 +95,7 @@ class LagrangeFilter(object):
     def __init__(
         self,
         name,
-        filenames,
+        filenames_or_dataset,
         variables,
         dimensions,
         sample_variables,
@@ -115,15 +118,28 @@ class LagrangeFilter(object):
         # Whether we're permitted to use uneven windows on either side
         self.uneven_window = uneven_window
 
-        # parcels uses a separate method, even though it's just changing the
-        # interpolation method on velocity variables
-        fieldset_constructor = parcels.FieldSet.from_netcdf
+        # choose the fieldset constructor depending on the format
+        # of the input data
+        if isinstance(filenames_or_dataset, xr.Dataset):
+            fieldset_constructor = parcels.FieldSet.from_xarray_dataset
+        else:
+            fieldset_constructor = parcels.FieldSet.from_netcdf
+
+        # for C-grid data, we have to change the interpolation method
+        fieldset_kwargs = {}
         if c_grid:
-            fieldset_constructor = parcels.FieldSet.from_c_grid_dataset
+            interp_method = {}
+            for v in variables:
+                if v in ["U", "V", "W"]:
+                    interp_method[v] = "cgrid_velocity"
+                else:
+                    interp_method[v] = "cgrid_tracer"
+
+            fieldset_kwargs["interp_method"] = interp_method
 
         # construct the OceanParcels FieldSet to use for particle advection
         self.fieldset = fieldset_constructor(
-            filenames, variables, dimensions, indices=indices, mesh=mesh
+            filenames_or_dataset, variables, dimensions, indices=indices, mesh=mesh, **fieldset_kwargs
         )
         # save the lon/lat on which to seed particles
         # this is saved here because if the grid is later made periodic, the
