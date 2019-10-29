@@ -16,6 +16,7 @@ import netCDF4
 import xarray as xr
 
 from .file import LagrangeParticleFile
+from .filter import Filter
 
 
 class LagrangeFilter(object):
@@ -62,8 +63,10 @@ class LagrangeFilter(object):
 
             Filenames can contain globs if the data is spread across
             multiple files.
-        variables (Dict[str, str]): A mapping from canonical variable
-            names to the variable names in your data files.
+        variables_or_data (Union[Dict[str, str], xarray.Dataset]): Either
+            a mapping from canonical variable names to the variable
+            names in your data files, or an xarray Dataset containing
+            the input data.
         dimensions (Dict[str, str]): A mapping from canonical dimension
             names to the dimension names in your data files.
         sample_variables ([str]): A list of variable names that should be sampled
@@ -94,7 +97,7 @@ class LagrangeFilter(object):
     def __init__(
         self,
         name,
-        filenames,
+        filenames_or_dataset,
         variables,
         dimensions,
         sample_variables,
@@ -120,22 +123,40 @@ class LagrangeFilter(object):
         # copy input file dictionaries so we can construct the output file
         # filenames dictionary is modified to expand globs when
         # the fieldset is constructed
-        self._filenames = filenames
+        self._filenames = filenames_or_dataset
         self._variables = variables
         self._dimensions = dimensions
         self._indices = indices
         # sample variables without the "var_" prefix
         self._sample_variables = sample_variables
 
-        # parcels uses a separate method, even though it's just changing the
-        # interpolation method on velocity variables
-        fieldset_constructor = parcels.FieldSet.from_netcdf
+        # choose the fieldset constructor depending on the format
+        # of the input data
+        if isinstance(filenames_or_dataset, xr.Dataset):
+            fieldset_constructor = parcels.FieldSet.from_xarray_dataset
+        else:
+            fieldset_constructor = parcels.FieldSet.from_netcdf
+
+        # for C-grid data, we have to change the interpolation method
+        fieldset_kwargs = {}
         if c_grid:
-            fieldset_constructor = parcels.FieldSet.from_c_grid_dataset
+            interp_method = {}
+            for v in variables:
+                if v in ["U", "V", "W"]:
+                    interp_method[v] = "cgrid_velocity"
+                else:
+                    interp_method[v] = "cgrid_tracer"
+
+            fieldset_kwargs["interp_method"] = interp_method
 
         # construct the OceanParcels FieldSet to use for particle advection
         self.fieldset = fieldset_constructor(
-            filenames, variables, dimensions, indices=indices, mesh=mesh
+            filenames_or_dataset,
+            variables,
+            dimensions,
+            indices=indices,
+            mesh=mesh,
+            **fieldset_kwargs,
         )
         # save the lon/lat on which to seed particles
         # this is saved here because if the grid is later made periodic, the
@@ -164,10 +185,8 @@ class LagrangeFilter(object):
         # create the filter - use a 4th order Butterworth for the moment
         # make sure to convert angular frequency back to linear for passing to the
         # filter constructor
-        fs = 1.0 / self.output_dt
-        self.inertial_filter = signal.butter(
-            4, highpass_frequency / (2 * np.pi), "highpass", fs=fs
-        )
+        self.fs = 1.0 / self.output_dt
+        self.inertial_filter = Filter(highpass_frequency / (2 * np.pi), self.fs)
 
         # timestep for advection
         self.advection_dt = advection_dt
@@ -443,10 +462,10 @@ class LagrangeFilter(object):
             # load data lazily as dask arrays, for forward and backward segments
             var_array_forward = da.from_array(
                 outfile.data("forward")[v], chunks=(None, "auto")
-            )
+            )[:-1, :]
             var_array_backward = da.from_array(
                 outfile.data("backward")[v], chunks=(None, "auto")
-            )
+            )[:-1, :]
 
             # get an index into the middle of the array
             time_index_data = var_array_backward.shape[0] - 1
@@ -455,7 +474,7 @@ class LagrangeFilter(object):
             # for var_array_forward, skip the initial output for both the sample-only and
             # sample-advection kernels, which have meaningless data
             var_array = da.concatenate(
-                (da.flip(var_array_backward[1:-1, :], axis=0), var_array_forward[:-1])
+                (da.flip(var_array_backward[1:, :], axis=0), var_array_forward)
             )
 
             da_out[v] = (time_index_data, var_array)
@@ -495,23 +514,7 @@ class LagrangeFilter(object):
         da_out = {}
         for v, a in advection_data.items():
             time_index_data, var_array = a
-
-            def filter_select(x):
-                return signal.filtfilt(*self.inertial_filter, x)[..., time_index_data]
-
-            # apply scipy filter as a ufunc
-            # mapping an array to scalar over the first axis, automatically vectorize execution
-            # and allow rechunking (since we have a chunk boundary across the first axis)
-            filtered = da.apply_gufunc(
-                filter_select,
-                "(i)->()",
-                var_array,
-                axis=0,
-                output_dtypes=var_array.dtype,
-                allow_rechunk=True,
-            )
-
-            da_out[v] = filtered.compute()
+            da_out[v] = self.inertial_filter.apply_filter(var_array, time_index_data)
 
         return da_out
 
@@ -550,6 +553,9 @@ class LagrangeFilter(object):
                 filtered output.
 
         """
+
+        if isinstance(self._filenames, xr.Dataset):
+            raise Exception("netCDF output with xarray input not (yet) supported")
 
         # index dictionary referring to variables in the source files
         indices = {self._dimensions[v]: ind for v, ind in self._indices.items()}

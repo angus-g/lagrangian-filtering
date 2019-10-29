@@ -43,14 +43,15 @@ def velocity_dataset(nt, w, curvilinear=False):
         "u": (["time", "y", "x"], u_full),
         "v": (["time", "y", "x"], np.zeros_like(u_full)),
     }
+    dataset_coords = {"x": x, "y": y, "time": t}
 
     if curvilinear:
         xc, yc = np.meshgrid(x, y)
-        dataset_vars["x_curv"] = (["y", "x"], xc)
-        dataset_vars["y_curv"] = (["y", "x"], yc)
+        dataset_coords["x_curv"] = (["y", "x"], xc)
+        dataset_coords["y_curv"] = (["y", "x"], yc)
 
     # create dataset
-    d = xr.Dataset(dataset_vars, coords={"x": x, "y": y, "time": t})
+    d = xr.Dataset(dataset_vars, coords=dataset_coords)
 
     return d, t, u
 
@@ -85,6 +86,33 @@ def test_sanity_advection(tmp_path):
     nt = 37
     w = 1 / 6
     d, t, u = velocity_dataset(nt, w)
+
+    f = filtering.LagrangeFilter(
+        "advection_test",
+        d,
+        {"U": "u", "V": "v"},
+        {"lon": "x", "lat": "y", "time": "time"},
+        sample_variables=["U"],
+        mesh="flat",
+        window_size=18 * 3600,
+        highpass_frequency=(w / 2) / 3600,
+        advection_dt=60,
+    )
+
+    transformed = f.advection_step(t[nt // 2], output_time=True)
+    t_trans = transformed["time"]
+    u_trans = transformed["var_U"][1][:, 4].compute()
+
+    assert np.allclose(u, u_trans, rtol=1e-1)
+    assert np.array_equal(t, t_trans)
+
+
+def test_sanity_advection_from_file(tmp_path):
+    """Sanity check of advection, with data loaded from a file."""
+
+    nt = 37
+    w = 1 / 6
+    d, t, u = velocity_dataset(nt, w)
     p = tmp_path / "data.nc"
     d.to_netcdf(p)
 
@@ -114,12 +142,10 @@ def test_curvilinear_advection(tmp_path):
     nt = 37
     w = 1 / 5
     d, t, u = velocity_dataset(nt, w, curvilinear=True)
-    p = tmp_path / "data.nc"
-    d.to_netcdf(p)
 
     f = filtering.LagrangeFilter(
         "curvilinear_test",
-        {"U": str(p), "V": str(p)},
+        d,
         {"U": "u", "V": "v"},
         {"lon": "x_curv", "lat": "y_curv", "time": "time"},
         sample_variables=["U"],
@@ -148,12 +174,10 @@ def test_zonally_periodic_advection(tmp_path):
     nt = 37
     w = 1 / 6
     d, t, u = velocity_dataset(nt, w)
-    p = tmp_path / "data.nc"
-    d.to_netcdf(p)
 
     f = filtering.LagrangeFilter(
         "periodic_test",
-        {"U": str(p), "V": str(p)},
+        d,
         {"U": "u", "V": "v"},
         {"lon": "x", "lat": "y", "time": "time"},
         sample_variables=["U"],
@@ -181,12 +205,10 @@ def test_meridionally_periodic_advection(tmp_path):
     nt = 37
     w = 1 / 6
     d, t, u = velocity_dataset(nt, w)
-    p = tmp_path / "data.nc"
-    d.to_netcdf(p)
 
     f = filtering.LagrangeFilter(
         "periodic_test",
-        {"U": str(p), "V": str(p)},
+        d,
         {"U": "v", "V": "u"},
         {"lon": "x", "lat": "y", "time": "time"},
         sample_variables=["V"],
@@ -213,12 +235,10 @@ def test_doubly_periodic_advection(tmp_path):
     nt = 37
     w = 1 / 6
     d, t, u = velocity_dataset(nt, w)
-    p = tmp_path / "data.nc"
-    d.to_netcdf(p)
 
     f = filtering.LagrangeFilter(
         "periodic_test",
-        {"U": str(p), "V": str(p)},
+        d,
         {"U": "u", "V": "u"},
         {"lon": "x", "lat": "y", "time": "time"},
         sample_variables=["V"],
@@ -237,7 +257,6 @@ def test_doubly_periodic_advection(tmp_path):
 
 
 def test_sanity_filtering_from_dataset(tmp_path):
-
     """Sanity check of filtering using the library.
 
     As with the :func:`~test_sanity` test, this sets up a mean
@@ -249,12 +268,10 @@ def test_sanity_filtering_from_dataset(tmp_path):
     nt = 37
     w = 1 / 6
     d, t, _ = velocity_dataset(nt, w)
-    p = tmp_path / "data.nc"
-    d.to_netcdf(p)
 
     f = filtering.LagrangeFilter(
         "sanity_test",
-        {"U": str(p), "V": str(p)},
+        d,
         {"U": "u", "V": "v"},
         {"lon": "x", "lat": "y", "time": "time"},
         sample_variables=["U"],
