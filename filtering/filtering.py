@@ -139,7 +139,12 @@ class LagrangeFilter(object):
 
         # construct the OceanParcels FieldSet to use for particle advection
         self.fieldset = fieldset_constructor(
-            filenames_or_dataset, variables, dimensions, indices=indices, mesh=mesh, **fieldset_kwargs
+            filenames_or_dataset,
+            variables,
+            dimensions,
+            indices=indices,
+            mesh=mesh,
+            **fieldset_kwargs,
         )
         # save the lon/lat on which to seed particles
         # this is saved here because if the grid is later made periodic, the
