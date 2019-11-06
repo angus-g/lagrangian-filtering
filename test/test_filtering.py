@@ -289,3 +289,27 @@ def test_sanity_filtering_from_dataset(tmp_path):
     assert filtered.size > 0
     value = filtered.item(0)
     assert value == pytest.approx(0.0, abs=1e-3)
+
+
+def test_absolute_times(tmp_path):
+    """Test decoding of absolute times"""
+
+    nt = 37
+    w = 1 / 6
+    d, t, _ = velocity_dataset(nt, w)
+
+    t = t.copy()
+
+    # offset absolute and relative times
+    d["time"] += 1800
+
+    f = filtering.LagrangeFilter(
+        "absolute_times",
+        d,
+        {"U": "u", "V": "v"},
+        {"lon": "x", "lat": "y", "time": "time"},
+        sample_variables=[],
+        window_size=0,
+    )
+
+    assert np.all(f._window_times(d["time"], True) == t)
