@@ -10,6 +10,7 @@ library.
 import dask.array as da
 import numpy as np
 from datetime import timedelta
+from glob import iglob
 import parcels
 from scipy import signal
 import netCDF4
@@ -612,7 +613,7 @@ class LagrangeFilter(object):
             if isinstance(filename, list):
                 filename = filename[0]
 
-            ds_orig = xr.open_dataset(filename)[file_dim]
+            ds_orig = xr.open_dataset(next(iglob(filename)))[file_dim]
 
             # create dimensions if needed
             for d in ds_orig.dims:
@@ -652,7 +653,7 @@ class LagrangeFilter(object):
 
             # select only the relevant indices
             # in particular, squeeze to drop z dimension if we index it out
-            ds_orig = xr.open_dataset(filename)[v_orig]
+            ds_orig = xr.open_dataset(next(iglob(filename)))[v_orig]
             ds_orig = ds_orig.isel(**indices).squeeze()
 
             # are dimensions defined specifically for this variable?
