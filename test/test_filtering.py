@@ -76,7 +76,7 @@ def test_sanity():
     assert fu[nt // 2] == pytest.approx(0.0, abs=1e-2)
 
 
-def test_sanity_advection(tmp_path):
+def test_sanity_advection():
     """Sanity check of advection.
 
     Using a uniform velocity field, the particles should have the same
@@ -136,7 +136,7 @@ def test_sanity_advection_from_file(tmp_path):
     assert np.array_equal(t, t_trans)
 
 
-def test_curvilinear_advection(tmp_path):
+def test_curvilinear_advection():
     """Sanity check of advection on a curvilinear grid."""
 
     nt = 37
@@ -163,7 +163,7 @@ def test_curvilinear_advection(tmp_path):
     assert np.array_equal(t, t_trans)
 
 
-def test_zonally_periodic_advection(tmp_path):
+def test_zonally_periodic_advection():
     """Sanity check of advection in a zonally periodic domain.
 
     Because the flow in this test is purely zonal, and we set up a
@@ -194,7 +194,7 @@ def test_zonally_periodic_advection(tmp_path):
     assert not np.any(np.isnan(u_trans))
 
 
-def test_meridionally_periodic_advection(tmp_path):
+def test_meridionally_periodic_advection():
     """Sanity check of advection in a meridionally periodic domain.
 
     Because the flow in this test is purely meridional, and we set up a
@@ -225,7 +225,7 @@ def test_meridionally_periodic_advection(tmp_path):
     assert not np.any(np.isnan(v_trans))
 
 
-def test_doubly_periodic_advection(tmp_path):
+def test_doubly_periodic_advection():
     """Sanity check of advection in a doubly periodic domain.
 
     The flow in this test is diagonal, but we set up a doubly-periodic
@@ -256,7 +256,7 @@ def test_doubly_periodic_advection(tmp_path):
     assert not np.any(np.isnan(v_trans))
 
 
-def test_sanity_filtering_from_dataset(tmp_path):
+def test_sanity_filtering_from_dataset():
     """Sanity check of filtering using the library.
 
     As with the :func:`~test_sanity` test, this sets up a mean
@@ -291,7 +291,7 @@ def test_sanity_filtering_from_dataset(tmp_path):
     assert value == pytest.approx(0.0, abs=1e-3)
 
 
-def test_absolute_times(tmp_path):
+def test_absolute_times():
     """Test decoding of absolute times"""
 
     nt = 37
