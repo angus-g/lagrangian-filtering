@@ -536,32 +536,56 @@ class LagrangeFilter(object):
         this latter case, only timesteps that have the full window
         size on either side are selected.
 
+        Note:
+            If `absolute` is True, the times must be the same datatype
+            as those the input data. For dates with a calendar, this
+            is likely :obj:`np.datetime64` or :obj:`cftime.datetime`.
+            For abstract times, this may simply be a number.
+
         Args:
             times (:obj:`[float]`, optional): A list of timesteps at
                 which to run the filtering. If this is omitted, all
                 timesteps that are fully covered by the filtering
                 window are selected.
 
+            absolute (:obj:`bool`, optional): If `times` is provided,
+                this argument determines whether to interpret them
+                as relative to the first timestep in the input dataset
+                (False, default), or as absolute, following the actual
+                time dimension in the dataset (True).
+
         """
 
         self(*args, **kwargs)
 
-    def __call__(self, times=None):
-        """Run the filtering process on this experiment."""
+    def _window_times(self, times, absolute):
+        """Restrict an array of times to those which have an adequate window,
+        optionally converting from absolute to relative first.
 
-        # run over the full range of valid time indices unless specified otherwise
+        """
+
         tgrid = self.fieldset.gridset.grids[0].time
+
         if times is None:
             times = tgrid.copy()
 
-            if self.uneven_window:
-                raise NotImplementedError("uneven windows aren't supported")
+        if absolute:
+            times = self.fieldset.gridset.grids[0].time_origin.reltime(times)
 
-        # restrict to period covered by window
         times = np.array(times)
         window_left = times - tgrid[0] >= self.window_size
         window_right = times <= tgrid[-1] - self.window_size
-        times = times[window_left & window_right]
+        return times[window_left & window_right]
+
+    def __call__(self, times=None, absolute=False):
+        """Run the filtering process on this experiment."""
+
+        if self.uneven_window:
+            raise NotImplementedError("uneven windows aren't supported")
+
+        # either restrict the specified times to period covered by window,
+        # or use the full range of times covered by window
+        times = self._window_times(times, absolute)
 
         da_out = {v: [] for v in self.sample_variables}
 
