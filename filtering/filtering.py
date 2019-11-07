@@ -665,7 +665,8 @@ class LagrangeFilter(object):
 
             # select only the relevant indices
             # in particular, squeeze to drop z dimension if we index it out
-            ds_orig = ds_orig.isel(**indices).squeeze()
+            local_indices = {k: v for k, v in indices.items() if k in ds_orig}
+            ds_orig = ds_orig.isel(**local_indices).squeeze()
 
             # are dimensions defined specifically for this variable?
             if v in self._dimensions:

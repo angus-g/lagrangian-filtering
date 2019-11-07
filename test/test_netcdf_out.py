@@ -165,6 +165,69 @@ def test_multiple_files(tmp_path):
     assert "var_V" not in d.variables
 
 
+def test_dimension_files(tmp_path):
+    """Test creation of output file where input variables pull dimensions
+    from different files.
+
+    """
+
+    os.chdir(tmp_path)
+
+    pvel = "test_vel.nc"
+    pdata = "test_data.nc"
+
+    # create a velocity dataset with depth data
+    coords = {
+        "lon": np.arange(5),
+        "lat": np.arange(4),
+        "depth": np.arange(3),
+        "time": np.arange(3),
+    }
+    d = xr.Dataset(
+        {
+            "U": (["time", "depth", "lat", "lon"], np.empty((3, 3, 4, 5))),
+            "V": (["time", "depth", "lat", "lon"], np.empty((3, 3, 4, 5))),
+        },
+        coords=coords,
+    )
+    d.to_netcdf(pvel)
+
+    # create a data dataset without depth data
+    del coords["depth"]
+    d = xr.Dataset(
+        {
+            "UBAR": (["time", "lat", "lon"], np.empty((3, 4, 5))),
+            "VBAR": (["time", "lat", "lon"], np.empty((3, 4, 5))),
+        },
+        coords=coords,
+    )
+    d.to_netcdf(pdata)
+
+    # filename dicts
+    fd = {d: pvel for d in ["lon", "lat", "depth", "data"]}
+    dd = fd.copy()
+    dd["data"] = pdata
+
+    f = filtering.LagrangeFilter(
+        "dimension_files",
+        {"U": fd, "V": fd, "UBAR": dd, "VBAR": dd},
+        {"U": "U", "V": "V", "UBAR": "UBAR", "VBAR": "VBAR"},
+        {k: k for k in ["lon", "lat", "depth", "time"]},
+        sample_variables=["UBAR", "VBAR"],
+        indices={"depth": [0]},
+    )
+    f.create_out().close()
+
+    out = Path("dimension_files.nc")
+    assert out.exists()
+
+    d = xr.open_dataset(out)
+    assert "var_UBAR" in d.variables
+    assert "var_VBAR" in d.variables
+
+    assert d["var_UBAR"].dims == ("time", "lat", "lon")
+
+
 def test_other_data(tmp_path):
     """Test creation of output file where a non-velocity variable is sampled."""
 
