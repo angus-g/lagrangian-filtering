@@ -52,6 +52,45 @@ def test_single_file(tmp_path):
     assert "var_V" not in d.variables
 
 
+def test_xarray_input(tmp_path):
+    """Test creation of output file from an xarray dataset."""
+
+    # because filtering puts files in the current directory, we need to change
+    # to the test directory
+    os.chdir(tmp_path)
+
+    coords = {"lon": np.arange(5), "lat": np.arange(4), "time": np.arange(3)}
+    d = xr.Dataset(
+        {
+            "U": (["time", "lat", "lon"], np.empty((3, 4, 5))),
+            "V": (["time", "lat", "lon"], np.empty((3, 4, 5))),
+        },
+        coords=coords,
+    )
+
+    # create class
+    f = filtering.LagrangeFilter(
+        "xarray_input",
+        d,
+        {"U": "U", "V": "V"},
+        {k: k for k in ["lon", "lat", "time"]},
+        sample_variables=["U"],
+    )
+
+    # create output file
+    f.create_out().close()
+
+    # check that we actually made the right file
+    out = Path("xarray_input.nc")
+    assert out.exists()
+
+    # check dimensions and sizes, and variables
+    d = xr.open_dataset(out)
+    assert d.dims == {"lon": 5, "lat": 4, "time": 0}
+    assert "var_U" in d.variables
+    assert "var_V" not in d.variables
+
+
 def test_clobber(tmp_path):
     """Test whether existing output files are clobbered."""
 

@@ -609,15 +609,18 @@ class LagrangeFilter(object):
 
             # get the file containing the dimension data
             v_orig = self._variables.get(var, var)
-            if isinstance(self._filenames[var], dict):
-                filename = self._filenames[var][dim]
+            if isinstance(self._filenames, xr.Dataset):
+                ds_orig = self._filenames[file_dim]
             else:
-                filename = self._filenames[var]
+                if isinstance(self._filenames[var], dict):
+                    filename = self._filenames[var][dim]
+                else:
+                    filename = self._filenames[var]
 
-            if isinstance(filename, list):
-                filename = filename[0]
+                if isinstance(filename, list):
+                    filename = filename[0]
 
-            ds_orig = xr.open_dataset(next(iglob(filename)))[file_dim]
+                ds_orig = xr.open_dataset(next(iglob(filename)))[file_dim]
 
             # create dimensions if needed
             for d in ds_orig.dims:
@@ -643,21 +646,25 @@ class LagrangeFilter(object):
             v_orig = self._variables.get(v, v)
 
             # open all the relevant files for this variable
-            if isinstance(self._filenames[v], dict):
-                # variable -> dictionary (for separate coordinate filse)
-                filename = self._filenames[v]["data"]
+            if isinstance(self._filenames, xr.Dataset):
+                ds_orig = self._filenames[v_orig]
             else:
-                # otherwise, we just have a plain variable -> file mapping
-                filename = self._filenames[v]
+                if isinstance(self._filenames[v], dict):
+                    # variable -> dictionary (for separate coordinate files)
+                    filename = self._filenames[v]["data"]
+                else:
+                    # otherwise, we just have a plain variable -> file mapping
+                    filename = self._filenames[v]
 
-            # globs can give us a list, but we only need the first item
-            # to get the metadata
-            if isinstance(filename, list):
-                filename = filename[0]
+                # globs can give us a list, but we only need the first item
+                # to get the metadata
+                if isinstance(filename, list):
+                    filename = filename[0]
+
+                ds_orig = xr.open_dataset(next(iglob(filename)))[v_orig]
 
             # select only the relevant indices
             # in particular, squeeze to drop z dimension if we index it out
-            ds_orig = xr.open_dataset(next(iglob(filename)))[v_orig]
             ds_orig = ds_orig.isel(**indices).squeeze()
 
             # are dimensions defined specifically for this variable?
