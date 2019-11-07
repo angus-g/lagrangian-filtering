@@ -52,6 +52,49 @@ def test_single_file(tmp_path):
     assert "var_V" not in d.variables
 
 
+def test_clobber(tmp_path):
+    """Test whether existing output files are clobbered."""
+
+    os.chdir(tmp_path)
+    out_path = tmp_path / "clobbering.nc"
+
+    # write an input file
+    p = "test.nc"
+    coords = {"lon": np.arange(5), "lat": np.arange(4), "time": np.arange(3)}
+    d = xr.Dataset(
+        {
+            "U": (["time", "lat", "lon"], np.empty((3, 4, 5))),
+            "V": (["time", "lat", "lon"], np.empty((3, 4, 5))),
+        },
+        coords=coords,
+    )
+    d.to_netcdf(p)
+
+    # create filter
+    f = filtering.LagrangeFilter(
+        "clobbering",
+        {"U": p, "V": p},
+        {"U": "U", "V": "V"},
+        {k: k for k in ["lon", "lat", "time"]},
+        sample_variables=["U"],
+    )
+
+    # first time, file should create correctly
+    with f.create_out() as d:
+        pass
+    assert out_path.exists()
+
+    # second time, we should fail on clobbering
+    with pytest.raises(OSError):
+        f.create_out()
+
+    # but, we should be able to open the file with the clobber flag
+    assert out_path.exists()
+    with f.create_out(clobber=True) as d:
+        pass
+    assert out_path.exists()
+
+
 def test_multiple_files(tmp_path):
     """Test creation of output file from multiple input files."""
 

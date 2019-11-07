@@ -559,6 +559,10 @@ class LagrangeFilter(object):
                 which to run the filtering. If this is omitted, all
                 timesteps that are fully covered by the filtering
                 window are selected.
+            clobber (:obj:`bool`, optional): Whether to overwrite any
+                existing output file with the same name as this
+                experiment. Default behaviour will not clobber an
+                existing output file.
 
             absolute (:obj:`bool`, optional): If `times` is provided,
                 this argument determines whether to interpret them
@@ -570,7 +574,7 @@ class LagrangeFilter(object):
 
         self(*args, **kwargs)
 
-    def create_out(self):
+    def create_out(self, clobber=False):
         """Create a netCDF dataset to hold filtered output.
 
         Here we create a new ``netCDF4.Dataset`` for filtered
@@ -588,7 +592,7 @@ class LagrangeFilter(object):
         indices = {self._dimensions[v]: ind for v, ind in self._indices.items()}
 
         # the output dataset we're creating
-        ds = netCDF4.Dataset(self.name + ".nc", "w")
+        ds = netCDF4.Dataset(self.name + ".nc", "w", clobber=clobber)
 
         # helper function to create the dimensions in the ouput file
         def create_dimension(dims, dim, var):
@@ -705,7 +709,7 @@ class LagrangeFilter(object):
         window_right = times <= tgrid[-1] - self.window_size
         return times[window_left & window_right]
 
-    def __call__(self, times=None, absolute=False):
+    def __call__(self, times=None, absolute=False, clobber=False):
         """Run the filtering process on this experiment."""
 
         if self.uneven_window:
@@ -715,7 +719,7 @@ class LagrangeFilter(object):
         # or use the full range of times covered by window
         times = self._window_times(times, absolute)
 
-        ds = self.create_out()
+        ds = self.create_out(clobber=clobber)
 
         # do the filtering at each timestep
         for idx, time in enumerate(times):
