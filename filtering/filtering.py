@@ -588,9 +588,6 @@ class LagrangeFilter(object):
 
         """
 
-        # index dictionary referring to variables in the source files
-        indices = {self._dimensions[v]: ind for v, ind in self._indices.items()}
-
         # the output dataset we're creating
         ds = netCDF4.Dataset(self.name + ".nc", "w", clobber=clobber)
 
@@ -663,16 +660,25 @@ class LagrangeFilter(object):
 
                 ds_orig = xr.open_dataset(next(iglob(filename)))[v_orig]
 
-            # select only the relevant indices
-            # in particular, squeeze to drop z dimension if we index it out
-            local_indices = {k: v for k, v in indices.items() if k in ds_orig}
-            ds_orig = ds_orig.isel(**local_indices).squeeze()
-
             # are dimensions defined specifically for this variable?
             if v in self._dimensions:
                 dims = self._dimensions[v]
             else:
                 dims = self._dimensions
+
+            # are indices defined specifically for this variable?
+            if v in self._indices:
+                indices = self._indices[v]
+            else:
+                indices = self._indices
+
+            # translate to variable names from the source files
+            indices = {dims[v]: ind for v, ind in indices.items()}
+
+            # select only the relevant indices
+            # in particular, squeeze to drop z dimension if we index it out
+            local_indices = {k: v for k, v in indices.items() if k in ds_orig}
+            ds_orig = ds_orig.isel(**local_indices).squeeze()
 
             # create time dimension if required (i.e. not already in the
             # output file we've created)
