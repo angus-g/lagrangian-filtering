@@ -78,6 +78,11 @@ class LagrangeFilter(object):
         mesh (Optional[str]): The OceanParcels mesh type, either "flat"
             or "spherical". "flat" meshes are expected to have dimensions
             in metres, and "spherical" meshes in degrees.
+        mask (Optional[str]): An optional string referring to a
+            boolean mask variable in the input dataset. Any sampled
+            variables within the mask region will be set to NaN during
+            advection, therefore the filtered output for particles
+            that enter the mask will also be NaN.
         c_grid (Optional[bool]): Whether to interpolate velocity
             components on an Arakawa C grid (defaults to no).
         indices (Optional[Dict[str, List[int]]]): An optional dictionary
@@ -111,6 +116,7 @@ class LagrangeFilter(object):
         variables,
         dimensions,
         sample_variables,
+        mask=None,
         c_grid=False,
         uneven_window=False,
         window_size=None,
@@ -199,7 +205,7 @@ class LagrangeFilter(object):
         if c_grid:
             self.particleclass.set_lonlatdepth_dtype(np.float64)
 
-        self._create_sample_kernel(sample_variables)
+        self._create_sample_kernel(sample_variables, mask)
         self.kernel = parcels.AdvectionRK4 + self.sample_kernel
 
         # compile kernels
@@ -235,16 +241,34 @@ class LagrangeFilter(object):
         # save grid timesteps
         self._output_grid = grid
 
-    def _create_sample_kernel(self, sample_variables):
+    def _create_sample_kernel(self, sample_variables, mask_var):
         """Create the parcels kernel for sampling fields during advection."""
 
         # make sure the fieldset has C code names assigned, etc.
         self.fieldset.check_complete()
 
+        # local variables within the kernel
+        funcvars = ["particle", "fieldset", "time"]
         # string for the kernel itself
         f_str = "def sample_kernel(particle, fieldset, time):\n"
+
+        if mask_var is not None:
+            # if we're using a mask variable, we multiple all the sample
+            # variables by our sampled mask
+            mask_str = "m * "
+
+            # mark "m" as a floating point variable that we use
+            funcvars += ["m"]
+            f_str += f"""
+\tm = 1
+\tif fieldset.{mask_var}[0, particle.depth, particle.lat, particle.lon] > 0:
+\t\tm = math.nan
+"""
+        else:
+            mask_str = ""
+
         for v in sample_variables:
-            f_str += f"\tparticle.var_{v} = fieldset.{v}[time, particle.depth, particle.lat, particle.lon]\n"
+            f_str += f"\tparticle.var_{v} = {mask_str}fieldset.{v}[time, particle.depth, particle.lat, particle.lon]\n"
         else:
             f_str += "\tpass"
 
@@ -253,7 +277,7 @@ class LagrangeFilter(object):
             self.fieldset,
             self.particleclass.getPType(),
             funcname="sample_kernel",
-            funcvars=["particle", "fieldset", "time"],
+            funcvars=funcvars,
             funccode=f_str,
         )
 
