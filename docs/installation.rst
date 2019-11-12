@@ -76,3 +76,36 @@ In the directory into which you cloned the repository. If the
 will pull changes to its corresponding git repository.
 
 .. _modified OceanParcels dependency: https://github.com/angus-g/parcels
+
+Working with Jupyter Notebooks
+------------------------------
+
+If you're working with Conda environments, or a regular virtual
+environment, it may be the case that you install
+`lagrangian-filtering`, but ``import filtering`` fails within a Jupyter
+notebook. This is because Jupyter doesn't know about your environment,
+so it's likely looking at your system Python installation instead. We
+can fix this by adding a new *kernel*. These instructions will be
+specific to pip, but you can substitute the activation and
+installation commands for Conda. First, make sure your environment is
+activated:
+
+.. code-block:: console
+
+   $ source env/bin/activate
+
+Now install `ipykernel`
+
+.. code-block:: console
+
+   $ pip install ipykernel
+
+You can use this package to register a new kernel for your environment:
+
+.. code-block:: console
+
+   $ python -m ipykernel --user --name=filtering
+
+When you're using Jupyter notebooks, you can either change to the new
+`filtering` kernel from the `Kernel` menu, or select `filtering`
+instead of "Python 3" when creating a new notebook.
