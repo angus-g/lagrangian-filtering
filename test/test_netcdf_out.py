@@ -228,6 +228,61 @@ def test_dimension_files(tmp_path):
     assert d["var_UBAR"].dims == ("time", "lat", "lon")
 
 
+def test_dims_indices_dicts(tmp_path):
+    """Test creation of output file where dimensions and indices are specified in
+    per-variable dictionaries, instead of globally."""
+
+    os.chdir(tmp_path)
+    p = "test.nc"
+
+    coords = {
+        "X": np.arange(5),
+        "Xp": np.arange(5) + 0.5,
+        "Y": np.arange(4),
+        "Yp": np.arange(4) + 0.5,
+        "Z": np.arange(3),
+        "Zm": np.arange(1),
+        "time": np.arange(3),
+    }
+
+    d = xr.Dataset(
+        {
+            "UVEL": (["time", "Z", "Y", "X"], np.empty((3, 3, 4, 5))),
+            "VVEL": (["time", "Z", "Y", "X"], np.empty((3, 3, 4, 5))),
+            "UBAR": (["time", "Zm", "Y", "Xp"], np.empty((3, 1, 4, 5))),
+            "VBAR": (["time", "Zm", "Yp", "X"], np.empty((3, 1, 4, 5))),
+        },
+        coords=coords,
+    )
+    d.to_netcdf(p)
+
+    dims = {
+        "U": {"lon": "X", "lat": "Y", "time": "time", "depth": "Z"},
+        "V": {"lon": "X", "lat": "Y", "time": "time", "depth": "Z"},
+        "UBAR": {"lon": "Xp", "lat": "Y", "time": "time", "depth": "Zm"},
+        "VBAR": {"lon": "X", "lat": "Yp", "time": "time", "depth": "Zm"},
+    }
+    indices = {
+        "U": {"depth": [2]},
+        "V": {"depth": [2]},
+        "UBAR": {"depth": [0]},
+        "VBAR": {"depth": [0]},
+    }
+
+    f = filtering.LagrangeFilter(
+        "dims_indices_dicts",
+        {v: p for v in ["U", "V", "UBAR", "VBAR"]},
+        {"U": "UVEL", "V": "VVEL", "UBAR": "UBAR", "VBAR": "VBAR"},
+        dims,
+        sample_variables=["UBAR", "VBAR"],
+        indices=indices,
+    )
+    f.create_out().close()
+
+    out = Path("dims_indices_dicts.nc")
+    assert out.exists()
+
+
 def test_other_data(tmp_path):
     """Test creation of output file where a non-velocity variable is sampled."""
 
