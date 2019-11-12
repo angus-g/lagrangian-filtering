@@ -10,8 +10,10 @@ library.
 import dask.array as da
 import numpy as np
 from datetime import timedelta
+from glob import iglob
 import parcels
 from scipy import signal
+import netCDF4
 import xarray as xr
 
 from .file import LagrangeParticleFile
@@ -101,7 +103,7 @@ class LagrangeFilter(object):
         sample_variables,
         mesh="flat",
         c_grid=False,
-        indices=None,
+        indices={},
         uneven_window=False,
         window_size=None,
         highpass_frequency=5e-5,
@@ -117,6 +119,16 @@ class LagrangeFilter(object):
             self.window_size = window_size
         # Whether we're permitted to use uneven windows on either side
         self.uneven_window = uneven_window
+
+        # copy input file dictionaries so we can construct the output file
+        # filenames dictionary is modified to expand globs when
+        # the fieldset is constructed
+        self._filenames = filenames_or_dataset
+        self._variables = variables
+        self._dimensions = dimensions
+        self._indices = indices
+        # sample variables without the "var_" prefix
+        self._sample_variables = sample_variables
 
         # choose the fieldset constructor depending on the format
         # of the input data
@@ -541,6 +553,10 @@ class LagrangeFilter(object):
                 which to run the filtering. If this is omitted, all
                 timesteps that are fully covered by the filtering
                 window are selected.
+            clobber (:obj:`bool`, optional): Whether to overwrite any
+                existing output file with the same name as this
+                experiment. Default behaviour will not clobber an
+                existing output file.
 
             absolute (:obj:`bool`, optional): If `times` is provided,
                 this argument determines whether to interpret them
@@ -551,6 +567,136 @@ class LagrangeFilter(object):
         """
 
         self(*args, **kwargs)
+
+    def create_out(self, clobber=False):
+        """Create a netCDF dataset to hold filtered output.
+
+        Here we create a new ``netCDF4.Dataset`` for filtered
+        output. For each sampled variable in the input files, a
+        corresponding variable in created in the output file, with
+        the same dimensions.
+
+        Returns:
+            netCDF4.Dataset: A single dataset that will hold all
+                filtered output.
+
+        """
+
+        # the output dataset we're creating
+        ds = netCDF4.Dataset(self.name + ".nc", "w", clobber=clobber)
+
+        # helper function to create the dimensions in the ouput file
+        def create_dimension(dims, dim, var):
+            # translate from parcels -> file convention
+            # and check whether we've already created this dimension
+            # (e.g. for a previous variable)
+            file_dim = dims[dim]
+            if file_dim in ds.variables:
+                return ds.variables[file_dim].dimensions[
+                    1
+                    if len(ds.variables[file_dim].dimensions) > 1 and dim == "lon"
+                    else 0
+                ]
+
+            # get the file containing the dimension data
+            v_orig = self._variables.get(var, var)
+            if isinstance(self._filenames, xr.Dataset):
+                ds_orig = self._filenames[file_dim]
+            else:
+                if isinstance(self._filenames[var], dict):
+                    filename = self._filenames[var][dim]
+                else:
+                    filename = self._filenames[var]
+
+                if isinstance(filename, list):
+                    filename = filename[0]
+
+                ds_orig = xr.open_dataset(next(iglob(filename)))[file_dim]
+
+            # create dimensions if needed
+            for d in ds_orig.dims:
+                if d not in ds.dimensions:
+                    ds.createDimension(d, ds_orig[d].size)
+
+            # create the dimension variable
+            ds.createVariable(file_dim, ds_orig.dtype, dimensions=ds_orig.dims)
+            ds.variables[file_dim][:] = ds_orig
+
+            # curvilinear grid case
+            return ds_orig.dims[1 if len(ds_orig.dims) > 1 and dim == "lon" else 0]
+
+        # create a time dimension if dimensions are uniform across all variables
+        if "time" in self._dimensions:
+            dim_time = self._dimensions["time"]
+            ds.createDimension(dim_time)
+        else:
+            dim_time = None
+
+        for v in self._sample_variables:
+            # translate if required (parcels -> file convention)
+            v_orig = self._variables.get(v, v)
+
+            # open all the relevant files for this variable
+            if isinstance(self._filenames, xr.Dataset):
+                ds_orig = self._filenames[v_orig]
+            else:
+                if isinstance(self._filenames[v], dict):
+                    # variable -> dictionary (for separate coordinate files)
+                    filename = self._filenames[v]["data"]
+                else:
+                    # otherwise, we just have a plain variable -> file mapping
+                    filename = self._filenames[v]
+
+                # globs can give us a list, but we only need the first item
+                # to get the metadata
+                if isinstance(filename, list):
+                    filename = filename[0]
+
+                ds_orig = xr.open_dataset(next(iglob(filename)))[v_orig]
+
+            # are dimensions defined specifically for this variable?
+            if v in self._dimensions:
+                dims = self._dimensions[v]
+            else:
+                dims = self._dimensions
+
+            # are indices defined specifically for this variable?
+            if v in self._indices:
+                indices = self._indices[v]
+            else:
+                indices = self._indices
+
+            # translate to variable names from the source files
+            indices = {dims[v]: ind for v, ind in indices.items()}
+
+            # select only the relevant indices
+            # in particular, squeeze to drop z dimension if we index it out
+            local_indices = {k: v for k, v in indices.items() if k in ds_orig}
+            ds_orig = ds_orig.isel(**local_indices).squeeze()
+
+            # create time dimension if required (i.e. not already in the
+            # output file we've created)
+            out_dims = {}
+            if dim_time is None:
+                out_dims["time"] = dims["time"]
+                if dims["time"] not in ds.dimensions:
+                    ds.createDimension(dims["time"])
+            else:
+                out_dims["time"] = dim_time
+
+            # for each non-time dimension, create it if it doesn't already exist
+            # in the output file
+            for d in ["lat", "lon"]:
+                out_dims[d] = create_dimension(dims, d, v)
+
+            # create the variable in the dataset itself
+            ds.createVariable(
+                "var_" + v,
+                "float32",
+                dimensions=(out_dims["time"], out_dims["lat"], out_dims["lon"]),
+            )
+
+        return ds
 
     def _window_times(self, times, absolute):
         """Restrict an array of times to those which have an adequate window,
@@ -571,7 +717,7 @@ class LagrangeFilter(object):
         window_right = times <= tgrid[-1] - self.window_size
         return times[window_left & window_right]
 
-    def __call__(self, times=None, absolute=False):
+    def __call__(self, times=None, absolute=False, clobber=False):
         """Run the filtering process on this experiment."""
 
         if self.uneven_window:
@@ -581,17 +727,16 @@ class LagrangeFilter(object):
         # or use the full range of times covered by window
         times = self._window_times(times, absolute)
 
-        da_out = {v: [] for v in self.sample_variables}
+        ds = self.create_out(clobber=clobber)
 
         # do the filtering at each timestep
         for idx, time in enumerate(times):
             # returns a dictionary of sample_variable -> dask array
             filtered = self.filter_step(self.advection_step(time))
             for v, a in filtered.items():
-                da_out[v].append(a)
+                ds[v][idx, ...] = a
 
-        # dump all to disk
-        da.to_hdf5(self.name + ".h5", {v: da.stack(a) for v, a in da_out.items()})
+        ds.close()
 
 
 def ParticleFactory(variables, name="SamplingParticle", BaseClass=parcels.JITParticle):
