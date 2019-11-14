@@ -17,6 +17,7 @@ import netCDF4
 import xarray as xr
 
 from .file import LagrangeParticleFile
+from .filter import Filter
 
 
 class LagrangeFilter(object):
@@ -185,10 +186,8 @@ class LagrangeFilter(object):
         # create the filter - use a 4th order Butterworth for the moment
         # make sure to convert angular frequency back to linear for passing to the
         # filter constructor
-        fs = 1.0 / self.output_dt
-        self.inertial_filter = signal.butter(
-            4, highpass_frequency / (2 * np.pi), "highpass", fs=fs
-        )
+        self.fs = 1.0 / self.output_dt
+        self.inertial_filter = Filter(highpass_frequency / (2 * np.pi), self.fs)
 
         # timestep for advection
         self.advection_dt = advection_dt
@@ -510,23 +509,7 @@ class LagrangeFilter(object):
         da_out = {}
         for v, a in advection_data.items():
             time_index_data, var_array = a
-
-            def filter_select(x):
-                return signal.filtfilt(*self.inertial_filter, x)[..., time_index_data]
-
-            # apply scipy filter as a ufunc
-            # mapping an array to scalar over the first axis, automatically vectorize execution
-            # and allow rechunking (since we have a chunk boundary across the first axis)
-            filtered = da.apply_gufunc(
-                filter_select,
-                "(i)->()",
-                var_array,
-                axis=0,
-                output_dtypes=var_array.dtype,
-                allow_rechunk=True,
-            )
-
-            da_out[v] = filtered.compute()
+            da_out[v] = self.inertial_filter.apply_filter(var_array, time_index_data)
 
         return da_out
 
