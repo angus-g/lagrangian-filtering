@@ -1,6 +1,8 @@
 import pytest
 
 import numpy as np
+import os
+from pathlib import Path
 from scipy import signal
 import xarray as xr
 
@@ -289,6 +291,55 @@ def test_sanity_filtering_from_dataset():
     assert filtered.size > 0
     value = filtered.item(0)
     assert value == pytest.approx(0.0, abs=1e-3)
+
+
+def test_full_filtering(tmp_chdir):
+    """Test running the full filtering workflow by calling the filter object."""
+
+    nt = 37
+    w = 1 / 6
+    d, t, _ = velocity_dataset(nt, w)
+
+    f = filtering.LagrangeFilter(
+        "full_filtering",
+        d,
+        {"U": "u", "V": "v"},
+        {"lon": "x", "lat": "y", "time": "time"},
+        sample_variables=["U"],
+        mesh="flat",
+        window_size=18 * 3600,
+        highpass_frequency=(w / 2) / 3600,
+        advection_dt=30 * 60,
+    )
+
+    f(t[nt // 2])
+    out = Path("full_filtering.nc")
+    assert out.exists()
+
+
+def test_masked_filtering(tmp_chdir):
+    """Test running the full filtering workflow, seeding only on a subdomain."""
+
+    nt = 37
+    w = 1 / 6
+    d, t, _ = velocity_dataset(nt, w)
+
+    f = filtering.LagrangeFilter(
+        "masked_filtering",
+        d,
+        {"U": "u", "V": "v"},
+        {"lon": "x", "lat": "y", "time": "time"},
+        sample_variables=["U"],
+        mesh="flat",
+        window_size=18 * 3600,
+        highpass_frequency=(w / 2) / 3600,
+        advection_dt=30 * 60,
+    )
+
+    f.seed_subdomain(500, 500, 500, 500)  # seed only the middle poin
+    f(t[nt // 2])
+    out = Path("masked_filtering.nc")
+    assert out.exists()
 
 
 def test_absolute_times():
