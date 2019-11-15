@@ -174,6 +174,11 @@ class LagrangeFilter(object):
                 self.fieldset.gridset.grids[0].lon, self.fieldset.gridset.grids[0].lat
             )
 
+        # save the original grid to allow subdomain seeding
+        self._orig_grid = self._grid_lon, self._grid_lat
+        # mask off output
+        self._grid_mask = np.ones_like(self._grid_lon, dtype=np.bool)
+
         # starts off non-periodic
         self._is_zonally_periodic = False
         self._is_meridionally_periodic = False
@@ -369,6 +374,53 @@ class LagrangeFilter(object):
         self._compile(self.kernel)
 
         self._is_meridionally_periodic = True
+
+    def seed_subdomain(self, min_lon=None, max_lon=None, min_lat=None, max_lat=None):
+        """Restrict particle seeding to a subdomain.
+
+        This uses the full set of available data for advection, but
+        restricts the particle seeding, and therefore data filtering,
+        to specified latitude/longitude.
+
+        Points in the output dataset that fall outside this seeding
+        range will not be written, and will thus have a missing value.
+
+        Args:
+            min_lon (:obj:`float`, optional): The lower bound on
+                longitude for which to seed particles. If not specifed,
+                seed from the western edge of the domain.
+            max_lon (:obj:`float`, optional): The upper bound on
+                longitude for which to seed particles. If not specifed,
+                seed from the easter edge of the domain.
+            min_lat (:obj:`float`, optional): The lower bound on
+                latitude for which to seed particles. If not specifed,
+                seed from the southern edge of the domain.
+            max_lat (:obj:`float`, optional): The upper bound on
+                latitude for which to seed particles. If not specifed,
+                seed from the northern edge of the domain.
+
+        """
+
+        lon, lat = self._orig_grid
+
+        # originally, mask selects full domain
+        mask = np.ones_like(lon, dtype=np.bool)
+
+        # restrict longitude
+        if min_lon is not None:
+            mask &= lon >= min_lon
+        if max_lon is not None:
+            mask &= lon <= max_lon
+
+        # restrict latitude
+        if min_lat is not None:
+            mask &= lat >= min_lat
+        if max_lat is not None:
+            mask &= lat <= max_lat
+
+        self._grid_mask = mask
+        self._grid_lon = lon[mask]
+        self._grid_lat = lat[mask]
 
     def particleset(self, time):
         """Create a ParticleSet initialised at the given time.
@@ -729,12 +781,18 @@ class LagrangeFilter(object):
 
         ds = self.create_out(clobber=clobber)
 
+        # create a masked array for output
+        out_masked = np.ma.masked_array(
+            np.empty_like(self._grid_mask, dtype=np.float), ~self._grid_mask
+        )
+
         # do the filtering at each timestep
         for idx, time in enumerate(times):
             # returns a dictionary of sample_variable -> dask array
             filtered = self.filter_step(self.advection_step(time))
             for v, a in filtered.items():
-                ds[v][idx, ...] = a
+                out_masked[self._grid_mask] = a
+                ds[v][idx, ...] = out_masked
 
         ds.close()
 
