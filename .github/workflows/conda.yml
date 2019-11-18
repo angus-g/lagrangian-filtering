@@ -1,0 +1,32 @@
+name: Conda Deployment
+
+on:
+  push:
+    tags:
+      - '**'
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Publish main release
+      uses: angus-g/conda-package-publish-action@master
+      if: "!contains(github.ref, 'beta')"
+      with:
+        subDir: '.'
+        AnacondaUsername: ${{ secrets.ANACONDA_USERNAME }}
+        AnacondaPassword: ${{ secrets.ANACONDA_PASSWORD }}
+        label: main
+        channels: angus-g conda-forge
+    - name: Publish beta release
+      uses: angus-g/conda-package-publish-action@master
+      if: "contains(github.ref, 'beta')"
+      with:
+        subDir: '.'
+        AnacondaUsername: ${{ secrets.ANACONDA_USERNAME }}
+        AnacondaPassword: ${{ secrets.ANACONDA_PASSWORD }}
+        label: beta
+        channels: angus-g conda-forge

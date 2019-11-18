@@ -3,7 +3,6 @@ package:
   version: {{ GIT_DESCRIBE_TAG }}
 
 source:
-  git_rev: master
   git_url: ./
 
 build:
@@ -13,7 +12,7 @@ build:
 requirements:
   build:
     - setuptools_scm
-    - python
+    - python {{ python }}
   run:
     - python >=3.6
     - dask
