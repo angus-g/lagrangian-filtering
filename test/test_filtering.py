@@ -293,10 +293,8 @@ def test_sanity_filtering_from_dataset():
     assert value == pytest.approx(0.0, abs=1e-3)
 
 
-def test_full_filtering(tmp_path):
+def test_full_filtering(tmp_chdir):
     """Test running the full filtering workflow by calling the filter object."""
-
-    os.chdir(tmp_path)
 
     nt = 37
     w = 1 / 6
@@ -319,10 +317,8 @@ def test_full_filtering(tmp_path):
     assert out.exists()
 
 
-def test_masked_filtering(tmp_path):
+def test_masked_filtering(tmp_chdir):
     """Test running the full filtering workflow, seeding only on a subdomain."""
-
-    os.chdir(tmp_path)
 
     nt = 37
     w = 1 / 6

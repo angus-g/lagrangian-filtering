@@ -6,6 +6,18 @@ import os
 import xarray as xr
 
 
+@pytest.fixture
+def tmp_chdir(tmp_path):
+    # change to tmp_path, saving current directory
+    original_dir = os.getcwd()
+    os.chdir(tmp_path)
+
+    yield True
+
+    # restore original directory
+    os.chdir(original_dir)
+
+
 @pytest.fixture(scope="function")
 def enable_threads():
     num_threads_old = None
