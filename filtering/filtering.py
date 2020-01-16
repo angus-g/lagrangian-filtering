@@ -671,7 +671,7 @@ class LagrangeFilter(object):
 
             # select only the relevant indices
             # in particular, squeeze to drop z dimension if we index it out
-            local_indices = {k: v for k, v in indices.items() if k in ds_orig}
+            local_indices = {k: v for k, v in indices.items() if k in ds_orig.dims}
             ds_orig = ds_orig.isel(**local_indices).squeeze()
 
             # create time dimension if required (i.e. not already in the
