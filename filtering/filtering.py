@@ -211,6 +211,9 @@ class LagrangeFilter(object):
         self._compile(self.sample_kernel)
         self._compile(self.kernel)
 
+        # options (compression, etc.) for creating output variables
+        self._output_variable_kwargs = {}
+
     def _create_sample_kernel(self, sample_variables):
         """Create the parcels kernel for sampling fields during advection."""
 
@@ -238,6 +241,29 @@ class LagrangeFilter(object):
 
         kernel.compile(compiler=parcels.compiler.GNUCompiler())
         kernel.load_lib()
+
+    def set_output_compression(self, complevel=None):
+        """Enable compression on variables in the output NetCDF file.
+
+        This enables zlib compression on the output file, which can
+        significantly improve filesize at a small expense to
+        computation time.
+
+        Args:
+            complevel (:obj:`int`, optional): If specified as a value
+                from 1-9, this overrides the default compression level
+                (4 for the netCDF4 library).
+        """
+
+        if complevel is not None:
+            if not isinstance(complevel, int) or not 1 <= complevel <= 9:
+                raise ValueError(
+                    "if specified, complevel must be an integer in the range 1-9"
+                )
+
+            self._output_variable_kwargs["complevel"] = complevel
+
+        self._output_variable_kwargs["zlib"] = True
 
     def make_zonally_periodic(self, width=None):
         """Mark the domain as zonally periodic.
@@ -746,6 +772,7 @@ class LagrangeFilter(object):
                 "var_" + v,
                 "float32",
                 dimensions=(out_dims["time"], out_dims["lat"], out_dims["lon"]),
+                **self._output_variable_kwargs,
             )
 
         return ds
