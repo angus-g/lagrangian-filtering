@@ -88,6 +88,10 @@ class LagrangeFilter(object):
             the forward and backward advection windows, in seconds. A
             longer window may better capture the low-frequency signal to be
             removed.
+        minimum_window (Optional[float]): If provided, particles will be
+            filtered if they successfully advected for at least this long
+            in total. This can increase the yield of filtered data by
+            salvaging particles that would otherwise be considered dead.
         highpass_frequency (Optional[float]): The 3dB cutoff frequency
             for filtering, below which spectral components will be
             attenuated. This should be an angular frequency, in [rad/s].
@@ -109,6 +113,7 @@ class LagrangeFilter(object):
         indices={},
         uneven_window=False,
         window_size=None,
+        minimum_window=None,
         highpass_frequency=5e-5,
         advection_dt=timedelta(minutes=5),
     ):
@@ -201,6 +206,11 @@ class LagrangeFilter(object):
 
         # options (compression, etc.) for creating output variables
         self._output_variable_kwargs = {}
+
+        # width of the minimum valid seeding window
+        self._min_window = None
+        if minimum_window is not None:
+            self._min_window = minimum_window / self.output_dt
 
     def _set_grid(self, grid):
         """Set the seeding grid from a parcels grid"""
@@ -664,7 +674,32 @@ class LagrangeFilter(object):
             time_index_data, var_array = a
 
             def filter_select(x):
-                return signal.filtfilt(*self.inertial_filter, x)[..., time_index_data]
+                ti = time_index_data
+
+                if self._min_window is not None:
+                    xn = np.isnan(x)
+                    # particles which fit minimum window requirement
+                    # that is, the number of non-NaN values is greater
+                    # than the minimum window size
+                    is_valid = (
+                        np.count_nonzero(~xn, axis=-1)[:, None] >= self._min_window
+                    )
+                    # pad value indices -- the index, per-particle, of the last
+                    # non-NaN value in each direction (forward and backward)
+                    pl = np.argmax(~xn, axis=-1)
+                    pr = x.shape[1] - np.argmax(np.flip(~xn, axis=-1), axis=-1) - 1
+                    # pad values -- get the value associated with the above index
+                    vl = x[np.arange(x.shape[0]), pl]
+                    vr = x[np.arange(x.shape[0]), pr]
+                    # do padding -- for valid particles according to the minimum
+                    # window size, set the backward NaN values to vl, and the
+                    # forward NaN values to vr
+                    x[:, :ti] = np.where(xn[:, :ti] & is_valid, vl[:, None], x[:, :ti])
+                    x[:, ti + 1 :] = np.where(
+                        xn[:, ti + 1 :] & is_valid, vr[:, None], x[:, ti + 1 :]
+                    )
+
+                return signal.filtfilt(*self.inertial_filter, x)[..., ti]
 
             # apply scipy filter as a ufunc
             # mapping an array to scalar over the first axis, automatically vectorize execution
