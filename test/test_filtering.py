@@ -352,7 +352,7 @@ def test_absolute_times():
     t = t.copy()
 
     # offset absolute and relative times
-    d["time"] += 1800
+    d.assign_coords(time=d["time"] + 1800)
 
     f = filtering.LagrangeFilter(
         "absolute_times",
