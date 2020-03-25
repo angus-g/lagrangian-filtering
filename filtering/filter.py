@@ -26,6 +26,7 @@ class Filter(object):
 
     def __init__(self, frequency, fs):
         self._filter = Filter.create_filter(frequency, fs)
+        self._min_window = False
 
     @staticmethod
     def create_filter(frequency, fs):
@@ -54,7 +55,25 @@ class Filter(object):
         """
 
         def filter_select(x):
-            return signal.filtfilt(*self._filter, x)[..., time_index]
+            ti = time_index
+
+            if self._min_window:
+                xn = np.isnan(x)
+                # particles which fit minimum window requirement
+                xnn = np.count_nonzero(xn, axis=-1)[:, None] <= ti
+                # pad value indices
+                pl = np.argmax(~xn, axis=-1)
+                pr = x.shape[1] - np.argmax(np.flip(~xn, axis=-1), axis=-1) - 1
+                # pad values
+                vl = x[np.arange(x.shape[0]), pl]
+                vr = x[np.arange(x.shape[0]), pr]
+                # do padding
+                x[:, :ti] = np.where(xn[:, :ti] & xnn, vl[:, None], x[:, :ti])
+                x[:, ti + 1 :] = np.where(
+                    xn[:, ti + 1 :] & xnn, vr[:, None], x[:, ti + 1 :]
+                )
+
+            return signal.filtfilt(*self._filter, x)[..., ti]
 
         # apply scipy filter as a ufunc
         # mapping an array to scalar over the first axis, automatically vectorize execution
@@ -62,10 +81,9 @@ class Filter(object):
         filtered = da.apply_gufunc(
             filter_select,
             "(i)->()",
-            data,
+            data.rechunk((-1, "auto")),
             axis=0,
             output_dtypes=data.dtype,
-            allow_rechunk=True,
         )
 
         return filtered.compute()
