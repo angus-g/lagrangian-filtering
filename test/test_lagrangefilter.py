@@ -1,5 +1,6 @@
 import pytest
 
+from datetime import timedelta
 import numpy as np
 import xarray as xr
 
@@ -23,22 +24,8 @@ c_grid = {
 }
 
 
-@pytest.fixture(
-    scope="module",
-    params=[(a_grid, False), (b_grid, False), (c_grid, True)],
-    ids=["A-grid", "B-grid", "C-grid"],
-)
-def dimensions_grid(request):
-    """Fixture for getting all three types of Arakawa grids"""
-
-    return request.param
-
-
-@pytest.fixture(scope="module")
-def parcels_args(dimensions_grid):
-    """Fixture for returning Parcels' triplet, parameterised for each type of Arakawa grid"""
-
-    dimensions, c_grid = dimensions_grid
+def parcels_arg_tuple(dimensions):
+    """Return Parcels triplet for given dimensions dictionary"""
 
     dims = {
         "xt": np.array([25, 75, 125]),
@@ -59,7 +46,27 @@ def parcels_args(dimensions_grid):
     dataset = xr.Dataset(dataset_vars, coords=dims)
     variables = {var: var for var in parcels_vars}
 
-    return dataset, variables, dimensions, c_grid
+    return dataset, variables, dimensions
+
+
+@pytest.fixture(
+    scope="module",
+    params=[(a_grid, False), (b_grid, False), (c_grid, True)],
+    ids=["A-grid", "B-grid", "C-grid"],
+)
+def dimensions_grid(request):
+    """Fixture for getting all three types of Arakawa grids"""
+
+    return request.param
+
+
+@pytest.fixture(scope="module")
+def parcels_args(dimensions_grid):
+    """Fixture for returning Parcels' args, parameterised for each type of Arakawa grid"""
+
+    dimensions, c_grid = dimensions_grid
+    arg_tuple = parcels_arg_tuple(dimensions)
+    return arg_tuple + (c_grid,)
 
 
 def test_particleset_default_particle_locations(parcels_args):
@@ -188,3 +195,22 @@ def test_particleset_set_grid_particle_locations(parcels_args):
     ps = f.particleset(0)
     assert np.array_equal(ps.lon, out_lon.flatten())
     assert np.array_equal(ps.lat, out_lat.flatten())
+
+
+def test_minwindow_size():
+    """Test that the minimum window size is set correctly."""
+
+    dataset, variables, dimensions = parcels_arg_tuple(a_grid)
+    # set output dt to be one day in seconds
+    dataset["time"] = np.array([0, 3600 * 24])
+
+    f = filtering.LagrangeFilter(
+        "test",
+        dataset,
+        variables,
+        dimensions,
+        sample_variables=["T"],
+        minimum_window=timedelta(days=3).total_seconds(),
+    )
+
+    assert f._min_window == pytest.approx(3)
