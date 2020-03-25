@@ -598,10 +598,9 @@ class LagrangeFilter(object):
             filtered = da.apply_gufunc(
                 filter_select,
                 "(i)->()",
-                var_array,
+                var_array.rechunk((-1, "auto")),
                 axis=0,
                 output_dtypes=var_array.dtype,
-                allow_rechunk=True,
             )
 
             da_out[v] = filtered.compute()
