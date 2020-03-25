@@ -4,19 +4,14 @@ import numpy as np
 import os
 from pathlib import Path
 import xarray as xr
+from netCDF4 import Dataset
 
 import filtering
 
 
-def test_single_file(tmp_path):
-    """Test creation of output file from a single input file."""
-
-    # because filtering puts files in the current directory, we need to change
-    # to the test directory
-    os.chdir(tmp_path)
-
-    # set up path for input file
-    p = "test.nc"
+@pytest.fixture
+def simple_dataset():
+    """Simple xarray dataset for filtering tests."""
 
     coords = {"lon": np.arange(5), "lat": np.arange(4), "time": np.arange(3)}
 
@@ -27,7 +22,20 @@ def test_single_file(tmp_path):
         },
         coords=coords,
     )
-    d.to_netcdf(p)
+
+    return d
+
+
+def test_single_file(tmp_path, simple_dataset):
+    """Test creation of output file from a single input file."""
+
+    # because filtering puts files in the current directory, we need to change
+    # to the test directory
+    os.chdir(tmp_path)
+
+    # set up path for input file
+    p = "test.nc"
+    simple_dataset.to_netcdf(p)
 
     # create class
     f = filtering.LagrangeFilter(
@@ -52,26 +60,17 @@ def test_single_file(tmp_path):
     assert "var_V" not in d.variables
 
 
-def test_xarray_input(tmp_path):
+def test_xarray_input(tmp_path, simple_dataset):
     """Test creation of output file from an xarray dataset."""
 
     # because filtering puts files in the current directory, we need to change
     # to the test directory
     os.chdir(tmp_path)
 
-    coords = {"lon": np.arange(5), "lat": np.arange(4), "time": np.arange(3)}
-    d = xr.Dataset(
-        {
-            "U": (["time", "lat", "lon"], np.empty((3, 4, 5))),
-            "V": (["time", "lat", "lon"], np.empty((3, 4, 5))),
-        },
-        coords=coords,
-    )
-
     # create class
     f = filtering.LagrangeFilter(
         "xarray_input",
-        d,
+        simple_dataset,
         {"U": "U", "V": "V"},
         {k: k for k in ["lon", "lat", "time"]},
         sample_variables=["U"],
@@ -91,7 +90,7 @@ def test_xarray_input(tmp_path):
     assert "var_V" not in d.variables
 
 
-def test_clobber(tmp_path):
+def test_clobber(tmp_path, simple_dataset):
     """Test whether existing output files are clobbered."""
 
     os.chdir(tmp_path)
@@ -99,15 +98,7 @@ def test_clobber(tmp_path):
 
     # write an input file
     p = "test.nc"
-    coords = {"lon": np.arange(5), "lat": np.arange(4), "time": np.arange(3)}
-    d = xr.Dataset(
-        {
-            "U": (["time", "lat", "lon"], np.empty((3, 4, 5))),
-            "V": (["time", "lat", "lon"], np.empty((3, 4, 5))),
-        },
-        coords=coords,
-    )
-    d.to_netcdf(p)
+    simple_dataset.to_netcdf(p)
 
     # create filter
     f = filtering.LagrangeFilter(
@@ -134,18 +125,15 @@ def test_clobber(tmp_path):
     assert out_path.exists()
 
 
-def test_multiple_files(tmp_path):
+def test_multiple_files(tmp_path, simple_dataset):
     """Test creation of output file from multiple input files."""
 
     os.chdir(tmp_path)
     pu = "test_u.nc"
     pv = "test_v.nc"
-    coords = {"lon": np.arange(5), "lat": np.arange(4), "time": np.arange(3)}
 
-    du = xr.Dataset({"U": (["time", "lat", "lon"], np.empty((3, 4, 5)))})
-    du.to_netcdf(pu)
-    dv = xr.Dataset({"V": (["time", "lat", "lon"], np.empty((3, 4, 5)))})
-    dv.to_netcdf(pv)
+    simple_dataset.U.to_netcdf(pu)
+    simple_dataset.V.to_netcdf(pv)
 
     f = filtering.LagrangeFilter(
         "multiple_files",
@@ -283,21 +271,13 @@ def test_dims_indices_dicts(tmp_path):
     assert out.exists()
 
 
-def test_other_data(tmp_path):
+def test_other_data(tmp_path, simple_dataset):
     """Test creation of output file where a non-velocity variable is sampled."""
 
     os.chdir(tmp_path)
     p = "test.nc"
-    coords = {"lon": np.arange(5), "lat": np.arange(4), "time": np.arange(3)}
-    d = xr.Dataset(
-        {
-            "U": (["time", "lat", "lon"], np.empty((3, 4, 5))),
-            "V": (["time", "lat", "lon"], np.empty((3, 4, 5))),
-            "P": (["time", "lat", "lon"], np.empty((3, 4, 5))),
-        },
-        coords=coords,
-    )
-    d.to_netcdf(p)
+    simple_dataset["P"] = (["time", "lat", "lon"], np.empty((3, 4, 5)))
+    simple_dataset.to_netcdf(p)
 
     f = filtering.LagrangeFilter(
         "other_data",
@@ -395,3 +375,55 @@ def test_curvilinear(tmp_path):
     assert d["var_U"].dims == ("time", "eta", "xi")
     assert "lat" in d.variables
     assert d["lat"].dims == ("eta", "xi")
+
+
+def test_valid_complevel(simple_dataset):
+    """Test setting compression levels for output."""
+
+    f = filtering.LagrangeFilter(
+        "valid_complevel",
+        simple_dataset,
+        {"U": "U", "V": "V"},
+        {k: k for k in ["lon", "lat", "time"]},
+        sample_variables=["U"],
+    )
+
+    with pytest.raises(ValueError, match="complevel must be an integer"):
+        f.set_output_compression("str")
+
+    # should not have enabled compression
+    assert f._output_variable_kwargs == {}
+
+    with pytest.raises(ValueError, match="complevel must be an integer"):
+        f.set_output_compression(42)
+
+    # should not have enabled compression
+    assert f._output_variable_kwargs == {}
+
+    f.set_output_compression(5)
+    assert f._output_variable_kwargs == {"zlib": True, "complevel": 5}
+
+
+def test_compression_setting(tmp_path, simple_dataset):
+    """Test whether compression is enabled if it's requested."""
+
+    os.chdir(tmp_path)
+
+    f = filtering.LagrangeFilter(
+        "compression",
+        simple_dataset,
+        {"U": "U", "V": "V"},
+        {k: k for k in ["lon", "lat", "time"]},
+        sample_variables=["U"],
+    )
+
+    f.set_output_compression()
+    f.create_out().close()
+
+    out = Path("compression.nc")
+    assert out.exists()
+
+    # use the lower level netCDF4 library to check the filters directly
+    d = Dataset(out)
+    assert "var_U" in d.variables
+    assert d.variables["var_U"].filters()["zlib"] == True

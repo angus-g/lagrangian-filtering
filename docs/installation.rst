@@ -104,7 +104,7 @@ You can use this package to register a new kernel for your environment:
 
 .. code-block:: console
 
-   $ python -m ipykernel --user --name=filtering
+   $ python -m ipykernel install --user --name=filtering
 
 When you're using Jupyter notebooks, you can either change to the new
 `filtering` kernel from the `Kernel` menu, or select `filtering`
