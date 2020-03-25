@@ -590,7 +590,23 @@ class LagrangeFilter(object):
             time_index_data, var_array = a
 
             def filter_select(x):
-                return signal.filtfilt(*self.inertial_filter, x)[..., time_index_data]
+                ti = time_index_data
+                xn = np.isnan(x)
+                # particles which fit minimum window requirement
+                xnn = np.count_nonzero(xn, axis=-1)[:, None] <= ti
+                # pad value indices
+                pl = np.argmax(~xn, axis=-1)
+                pr = x.shape[1] - np.argmax(np.flip(~xn, axis=-1), axis=-1) - 1
+                # pad values
+                vl = x[np.arange(x.shape[0]), pl]
+                vr = x[np.arange(x.shape[0]), pr]
+                # do padding
+                x[:, :ti] = np.where(xn[:, :ti] & xnn, vl[:, None], x[:, :ti])
+                x[:, ti + 1 :] = np.where(
+                    xn[:, ti + 1 :] & xnn, vr[:, None], x[:, ti + 1 :]
+                )
+
+                return signal.filtfilt(*self.inertial_filter, x)[..., ti]
 
             # apply scipy filter as a ufunc
             # mapping an array to scalar over the first axis, automatically vectorize execution
