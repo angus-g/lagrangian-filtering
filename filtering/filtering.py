@@ -214,6 +214,9 @@ class LagrangeFilter(object):
         # options (compression, etc.) for creating output variables
         self._output_variable_kwargs = {}
 
+        # feature flags
+        self._min_window = False
+
     def _create_sample_kernel(self, sample_variables):
         """Create the parcels kernel for sampling fields during advection."""
 
@@ -591,20 +594,22 @@ class LagrangeFilter(object):
 
             def filter_select(x):
                 ti = time_index_data
-                xn = np.isnan(x)
-                # particles which fit minimum window requirement
-                xnn = np.count_nonzero(xn, axis=-1)[:, None] <= ti
-                # pad value indices
-                pl = np.argmax(~xn, axis=-1)
-                pr = x.shape[1] - np.argmax(np.flip(~xn, axis=-1), axis=-1) - 1
-                # pad values
-                vl = x[np.arange(x.shape[0]), pl]
-                vr = x[np.arange(x.shape[0]), pr]
-                # do padding
-                x[:, :ti] = np.where(xn[:, :ti] & xnn, vl[:, None], x[:, :ti])
-                x[:, ti + 1 :] = np.where(
-                    xn[:, ti + 1 :] & xnn, vr[:, None], x[:, ti + 1 :]
-                )
+
+                if self._min_window:
+                    xn = np.isnan(x)
+                    # particles which fit minimum window requirement
+                    xnn = np.count_nonzero(xn, axis=-1)[:, None] <= ti
+                    # pad value indices
+                    pl = np.argmax(~xn, axis=-1)
+                    pr = x.shape[1] - np.argmax(np.flip(~xn, axis=-1), axis=-1) - 1
+                    # pad values
+                    vl = x[np.arange(x.shape[0]), pl]
+                    vr = x[np.arange(x.shape[0]), pr]
+                    # do padding
+                    x[:, :ti] = np.where(xn[:, :ti] & xnn, vl[:, None], x[:, :ti])
+                    x[:, ti + 1 :] = np.where(
+                        xn[:, ti + 1 :] & xnn, vr[:, None], x[:, ti + 1 :]
+                    )
 
                 return signal.filtfilt(*self.inertial_filter, x)[..., ti]
 
