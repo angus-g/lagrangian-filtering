@@ -668,6 +668,7 @@ class LagrangeFilter(object):
             # translate from parcels -> file convention
             # and check whether we've already created this dimension
             # (e.g. for a previous variable)
+            # we have extra logic to handle the curvilinear case here
             file_dim = dims[dim]
             if file_dim in ds.variables:
                 return ds.variables[file_dim].dimensions[
@@ -676,13 +677,14 @@ class LagrangeFilter(object):
                     else 0
                 ]
 
-            # get the file containing the dimension data
+            # get the file containing the dimension data as a DataArray
             v_orig = self._variables.get(var, var)
             if isinstance(self._filenames, xr.Dataset):
                 ds_orig = self._filenames[file_dim]
             else:
                 if isinstance(self._filenames[var], dict):
-                    filename = self._filenames[var][dim]
+                    # time dimension accompanies the data itself, unlike spatial dimensions
+                    filename = self._filenames[var][dim if dim != "time" else "data"]
                 else:
                     filename = self._filenames[var]
 
@@ -694,21 +696,22 @@ class LagrangeFilter(object):
             # create dimensions if needed
             for d in ds_orig.dims:
                 if d not in ds.dimensions:
-                    ds.createDimension(d, ds_orig[d].size)
+                    # create a record dimension for time
+                    ds.createDimension(d, None if dim == "time" else ds_orig[d].size)
 
             # create the dimension variable
             ds.createVariable(file_dim, ds_orig.dtype, dimensions=ds_orig.dims)
-            ds.variables[file_dim][:] = ds_orig
+            # copy data if a spatial variable
+            if dim != "time":
+                ds.variables[file_dim][:] = ds_orig
 
-            # curvilinear grid case
+            # copy attributes
+            attrs = ds_orig.attrs
+            if attrs != {}:
+                ds.variables[file_dim].setncattrs(ds_orig.attrs)
+
+            # return the dimension name, handling the curvilinear grid case
             return ds_orig.dims[1 if len(ds_orig.dims) > 1 and dim == "lon" else 0]
-
-        # create a time dimension if dimensions are uniform across all variables
-        if "time" in self._dimensions:
-            dim_time = self._dimensions["time"]
-            ds.createDimension(dim_time)
-        else:
-            dim_time = None
 
         for v in self._sample_variables:
             # translate if required (parcels -> file convention)
@@ -752,19 +755,10 @@ class LagrangeFilter(object):
             local_indices = {k: v for k, v in indices.items() if k in ds_orig.dims}
             ds_orig = ds_orig.isel(**local_indices).squeeze()
 
-            # create time dimension if required (i.e. not already in the
-            # output file we've created)
+            # for each dimension, create it if it doesn't already exist
+            # in the output file, and copy across its data
             out_dims = {}
-            if dim_time is None:
-                out_dims["time"] = dims["time"]
-                if dims["time"] not in ds.dimensions:
-                    ds.createDimension(dims["time"])
-            else:
-                out_dims["time"] = dim_time
-
-            # for each non-time dimension, create it if it doesn't already exist
-            # in the output file
-            for d in ["lat", "lon"]:
+            for d in ["time", "lat", "lon"]:
                 out_dims[d] = create_dimension(dims, d, v)
 
             # create the variable in the dataset itself
