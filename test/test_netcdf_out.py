@@ -47,7 +47,8 @@ def test_single_file(tmp_path, simple_dataset):
     )
 
     # create output file
-    f.create_out().close()
+    ds, _ = f.create_out()
+    ds.close()
 
     # check that we actually made the right file
     out = Path("single_file.nc")
@@ -77,7 +78,8 @@ def test_xarray_input(tmp_path, simple_dataset):
     )
 
     # create output file
-    f.create_out().close()
+    ds, _ = f.create_out()
+    ds.close()
 
     # check that we actually made the right file
     out = Path("xarray_input.nc")
@@ -88,6 +90,25 @@ def test_xarray_input(tmp_path, simple_dataset):
     assert d.dims == {"lon": 5, "lat": 4, "time": 0}
     assert "var_U" in d.variables
     assert "var_V" not in d.variables
+
+
+def test_time_dim(tmp_path, simple_dataset):
+    """Test the correct time dimension is returned from the input file."""
+
+    os.chdir(tmp_path)
+
+    f = filtering.LagrangeFilter(
+        "time_dim",
+        simple_dataset,
+        {"U": "U", "V": "V"},
+        {k: k for k in ["lon", "lat", "time"]},
+        sample_variables=["U"],
+    )
+
+    ds, time_dim = f.create_out()
+    ds.close()
+
+    assert time_dim == "time"
 
 
 def test_clobber(tmp_path, simple_dataset):
@@ -110,7 +131,7 @@ def test_clobber(tmp_path, simple_dataset):
     )
 
     # first time, file should create correctly
-    with f.create_out() as d:
+    with f.create_out()[0] as d:
         pass
     assert out_path.exists()
 
@@ -120,7 +141,7 @@ def test_clobber(tmp_path, simple_dataset):
 
     # but, we should be able to open the file with the clobber flag
     assert out_path.exists()
-    with f.create_out(clobber=True) as d:
+    with f.create_out(clobber=True)[0] as d:
         pass
     assert out_path.exists()
 
@@ -142,7 +163,8 @@ def test_multiple_files(tmp_path, simple_dataset):
         {k: k for k in ["lon", "lat", "time"]},
         sample_variables=["U"],
     )
-    f.create_out().close()
+    ds, _ = f.create_out()
+    ds.close()
 
     out = Path("multiple_files.nc")
     assert out.exists()
@@ -204,7 +226,8 @@ def test_dimension_files(tmp_path):
         sample_variables=["UBAR", "VBAR"],
         indices={"depth": [0]},
     )
-    f.create_out().close()
+    ds, _ = f.create_out()
+    ds.close()
 
     out = Path("dimension_files.nc")
     assert out.exists()
@@ -265,7 +288,8 @@ def test_dims_indices_dicts(tmp_path):
         sample_variables=["UBAR", "VBAR"],
         indices=indices,
     )
-    f.create_out().close()
+    ds, _ = f.create_out()
+    ds.close()
 
     out = Path("dims_indices_dicts.nc")
     assert out.exists()
@@ -286,7 +310,8 @@ def test_other_data(tmp_path, simple_dataset):
         {k: k for k in ["lon", "lat", "time"]},
         sample_variables=["P"],
     )
-    f.create_out().close()
+    ds, _ = f.create_out()
+    ds.close()
 
     out = Path("other_data.nc")
     assert out.exists()
@@ -331,7 +356,8 @@ def test_staggered(tmp_path):
         },
         sample_variables=v,
     )
-    f.create_out().close()
+    ds, _ = f.create_out()
+    ds.close()
 
     out = Path("staggered.nc")
     assert out.exists()
@@ -365,7 +391,8 @@ def test_curvilinear(tmp_path):
         {k: k for k in ["lon", "lat", "time"]},
         sample_variables=["U"],
     )
-    f.create_out().close()
+    ds, _ = f.create_out()
+    ds.close()
 
     out = Path("curvilinear.nc")
     assert out.exists()
@@ -418,7 +445,8 @@ def test_compression_setting(tmp_path, simple_dataset):
     )
 
     f.set_output_compression()
-    f.create_out().close()
+    ds, _ = f.create_out()
+    ds.close()
 
     out = Path("compression.nc")
     assert out.exists()

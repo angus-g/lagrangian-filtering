@@ -15,6 +15,7 @@ import parcels
 from scipy import signal
 import netCDF4
 import xarray as xr
+import cftime
 
 from .file import LagrangeParticleFile
 
@@ -587,6 +588,11 @@ class LagrangeFilter(object):
 
         da_out = {}
         for v, a in advection_data.items():
+            # don't try to filter the time axis, just take the middle value
+            if v == "time":
+                da_out[v] = a[a.size // 2]
+                continue
+
             time_index_data, var_array = a
 
             def filter_select(x):
@@ -635,7 +641,6 @@ class LagrangeFilter(object):
                 existing output file with the same name as this
                 experiment. Default behaviour will not clobber an
                 existing output file.
-
             absolute (:obj:`bool`, optional): If `times` is provided,
                 this argument determines whether to interpret them
                 as relative to the first timestep in the input dataset
@@ -657,11 +662,13 @@ class LagrangeFilter(object):
         Returns:
             netCDF4.Dataset: A single dataset that will hold all
                 filtered output.
+            str: The name of the time dimension in the output file.
 
         """
 
         # the output dataset we're creating
         ds = netCDF4.Dataset(self.name + ".nc", "w", clobber=clobber)
+        time_dim = None
 
         # helper function to create the dimensions in the ouput file
         def create_dimension(dims, dim, var):
@@ -691,7 +698,9 @@ class LagrangeFilter(object):
                 if isinstance(filename, list):
                     filename = filename[0]
 
-                ds_orig = xr.open_dataset(next(iglob(filename)))[file_dim]
+                ds_orig = xr.open_dataset(next(iglob(filename)), decode_times=False)[
+                    file_dim
+                ]
 
             # create dimensions if needed
             for d in ds_orig.dims:
@@ -708,7 +717,7 @@ class LagrangeFilter(object):
             # copy attributes
             attrs = ds_orig.attrs
             if attrs != {}:
-                ds.variables[file_dim].setncattrs(ds_orig.attrs)
+                ds.variables[file_dim].setncatts(ds_orig.attrs)
 
             # return the dimension name, handling the curvilinear grid case
             return ds_orig.dims[1 if len(ds_orig.dims) > 1 and dim == "lon" else 0]
@@ -761,6 +770,9 @@ class LagrangeFilter(object):
             for d in ["time", "lat", "lon"]:
                 out_dims[d] = create_dimension(dims, d, v)
 
+            if time_dim is None:
+                time_dim = out_dims["time"]
+
             # create the variable in the dataset itself
             ds.createVariable(
                 "var_" + v,
@@ -769,7 +781,7 @@ class LagrangeFilter(object):
                 **self._output_variable_kwargs,
             )
 
-        return ds
+        return ds, time_dim
 
     def _window_times(self, times, absolute):
         """Restrict an array of times to those which have an adequate window,
@@ -790,6 +802,25 @@ class LagrangeFilter(object):
         window_right = times <= tgrid[-1] - self.window_size
         return times[window_left & window_right]
 
+    def _convert_time(self, t, ds, dim):
+        """Convert a relative time value in seconds to the right format.
+
+        This makes use of parcels' TimeConverter to get a relative
+        time back to an absolute time. However, if the original time
+        units require a calendar, we can't just output this directly
+        to the netCDF file, so we need to strip the calendar with
+        date2num.
+
+        """
+
+        t = self.fieldset.time_origin.fulltime(t)
+
+        if "units" not in ds[dim].ncattrs():
+            return t
+
+        # use cftime to convert seconds back to the date-relevant number
+        return cftime.date2num(t, ds[dim].units, calendar=ds[dim].calendar)
+
     def __call__(self, times=None, absolute=False, clobber=False):
         """Run the filtering process on this experiment."""
 
@@ -800,7 +831,7 @@ class LagrangeFilter(object):
         # or use the full range of times covered by window
         times = self._window_times(times, absolute)
 
-        ds = self.create_out(clobber=clobber)
+        ds, time_dim = self.create_out(clobber=clobber)
 
         # create a masked array for output
         out_masked = np.ma.masked_array(
@@ -810,8 +841,13 @@ class LagrangeFilter(object):
         # do the filtering at each timestep
         for idx, time in enumerate(times):
             # returns a dictionary of sample_variable -> dask array
-            filtered = self.filter_step(self.advection_step(time))
+            filtered = self.filter_step(self.advection_step(time, output_time=True))
             for v, a in filtered.items():
+                # append time to output file
+                if v == "time":
+                    ds[time_dim][idx] = self._convert_time(a, ds, time_dim)
+                    continue
+
                 out_masked[self._grid_mask] = a
                 ds[v][idx, ...] = out_masked
 
