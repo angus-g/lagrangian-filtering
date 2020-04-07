@@ -317,6 +317,74 @@ def test_full_filtering(tmp_chdir):
     assert out.exists()
 
 
+def test_filtering_output_times(tmp_chdir):
+    """Test that input times are copied to the output file."""
+
+    nt = 37
+    w = 1 / 6
+    d, t, _ = velocity_dataset(nt, w)
+
+    f = filtering.LagrangeFilter(
+        "output_times",
+        d,
+        {"U": "u", "V": "v"},
+        {"lon": "x", "lat": "y", "time": "time"},
+        sample_variables=["U"],
+        mesh="flat",
+        window_size=9 * 3600,
+        highpass_frequency=(w / 2) / 3600,
+        advection_dt=30 * 60,
+    )
+
+    f()
+    out = Path("output_times.nc")
+    assert out.exists()
+
+    d_out = xr.open_dataset(out)
+    xr.testing.assert_allclose(d_out.time, d.time[9:-9])
+
+
+def test_filtering_output_times_with_calendar(tmp_chdir):
+    """Test that input times from a file with a calendar
+    are correctly copied to the output file."""
+
+    nt = 37
+    w = 1 / 6
+    d, t, _ = velocity_dataset(nt, w)
+
+    # modify the dataset to have a "days since ..." calendar
+    d["time"] = d["time"] / 3600 / 24
+    d.time.attrs["units"] = "days since 1900-01-01 00:00:00"
+    d.time.attrs["calendar"] = "NOLEAP"
+    d.to_netcdf("data.nc")
+
+    f = filtering.LagrangeFilter(
+        "output_calendar",
+        {"U": "data.nc", "V": "data.nc"},
+        {"U": "u", "V": "v"},
+        {"lon": "x", "lat": "y", "time": "time"},
+        sample_variables=["U"],
+        mesh="flat",
+        window_size=9 * 3600,
+        highpass_frequency=(w / 2) / 3600,
+        advection_dt=30 * 60,
+    )
+
+    f()
+    out = Path("output_calendar.nc")
+    assert out.exists()
+
+    # open the datasets without decoding the time axis so we can compare
+    d_out = xr.open_dataset(out)  # , decode_times=False)
+    d_in = xr.open_dataset("data.nc")  # , decode_times=False)
+
+    # check the calendar attributes were propagated
+    assert d_out.time.attrs == d_in.time.attrs
+
+    # check the time values themselves
+    xr.testing.assert_allclose(d_out.time, d_in.time[9:-9])
+
+
 def test_masked_filtering(tmp_chdir):
     """Test running the full filtering workflow, seeding only on a subdomain."""
 
