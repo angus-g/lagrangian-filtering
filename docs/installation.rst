@@ -14,7 +14,7 @@ If you use Conda_ to manage Python packages, you may run
 
 .. code-block:: console
 
-   $ conda install -c angus-g -c conda-forge lagrangian-filtering
+   $ conda install -c conda-forge -c angus-g lagrangian-filtering
 
 to install this package and all its required dependencies. The ``-c
 angus-g`` flag must come before the ``-c conda-forge`` flag to ensure
@@ -25,7 +25,7 @@ in its own Conda environment:
 
 .. code-block:: console
 
-   $ conda create -n filtering -c angus-g -c conda-forge lagrangian-filtering
+   $ conda create -n filtering -c conda-forge -c angus-g lagrangian-filtering
 
 The created environment can be activated by running
 
@@ -45,8 +45,7 @@ Using Pip
 ---------
 
 On the other hand, you may not use Conda, or you wish to develop
-either `lagrangian-filtering` or its `modified OceanParcels
-dependency`_. In these cases, it is easier to install a modifiable
+for `lagrangian-filtering`. In these cases, it is easier to install a modifiable
 version of the package in a virtual environment.
 
 .. code-block:: console
@@ -56,6 +55,7 @@ version of the package in a virtual environment.
    $ virtualenv env
    $ source env/bin/activate
    $ pip install -e .
+   $ pip install -r requirements.txt
 
 This will install `lagrangian-filtering` as a
 development package, where changes to the files in the git repository
@@ -73,8 +73,6 @@ In the directory into which you cloned the repository. If the
    $ pip install --upgrade --upgrade-strategy eager .
 
 will pull changes to its corresponding git repository.
-
-.. _modified OceanParcels dependency: https://github.com/angus-g/parcels
 
 Working with Jupyter Notebooks
 ------------------------------

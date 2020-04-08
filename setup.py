@@ -7,7 +7,7 @@ setup(
     use_scm_version=True,
     setup_requires=["setuptools_scm"],
     packages=find_packages(),
-    extras_require={"build": ["pytest", "xarray", "cloudpickle"]},
+    extras_require={"build": ["pytest",]},
     install_requires=[
         "dask[array]",
         "h5py",
@@ -16,6 +16,6 @@ setup(
         "xarray",
         "netCDF4",
         "cftime",
-        "parcels @ git+https://github.com/angus-g/parcels@lagrangian-filtering",
+        "parcels @ git+https://github.com/OceanParcels/parcels",
     ],
 )
