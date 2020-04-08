@@ -41,18 +41,14 @@ Python environment.
 1. Clone this repository `git clone https://github.com/angus-g/lagrangian-filtering`
 2. Change to the directory `cd lagrangian-filtering`
 3. (Optional) Create the virtualenv `virtualenv env` and activate it `source env/bin/activate`
-4. Install the prerequisites `pip install -r requirements.txt`
-5. Install the development version of the package `pip install -e .`
+4. Install the development version of the package `pip install -e .`
 
 #### Upgrading
 With the package installed in development mode, updating is as easy as
 `git pull` (or making local changes) in the `lagrangian-filtering`
-directory. If changes are made to the underlying OceanParcels package,
-re-install the prerequisites with `pip install -r
-requirements.txt`. You should see a message about running `git` in the
-output. Failing that, you may manually change to the `src/parcels`
-directory within your pip directory, or your virtualenv, and run `git
-pull` as usual.
+directory. If dependencies (particularly parcels) need to be updated,
+run `pip install --upgrade --upgrade-strategy eager .` to force installation
+of the new versions.
 
 ## Usage
 For the moment, it's easiest to set up the filtering workflow in a script or

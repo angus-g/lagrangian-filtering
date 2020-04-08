@@ -55,11 +55,10 @@ version of the package in a virtual environment.
    $ cd lagrangian-filtering
    $ virtualenv env
    $ source env/bin/activate
-   $ pip install -r requirements.txt
    $ pip install -e .
 
-This will install both `lagrangian-filtering` and `parcels` as
-development packages, where changes to the files in the git repository
+This will install `lagrangian-filtering` as a
+development package, where changes to the files in the git repository
 will be reflected in your Python environment. To update `lagrangian-filtering`, run
 
 .. code-block:: console
@@ -71,7 +70,7 @@ In the directory into which you cloned the repository. If the
 
 .. code-block:: console
 
-   $ pip install -r requirements.txt
+   $ pip install --upgrade --upgrade-strategy eager .
 
 will pull changes to its corresponding git repository.
 
