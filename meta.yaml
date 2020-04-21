@@ -20,7 +20,7 @@ requirements:
     - h5py
     - numpy >=1.17.0
     - scipy >=1.2.0
-    - parcels
+    - parcels >=2.1.5
 
 about:
   home: https://github.com/angus-g/lagrangian-filtering
