@@ -42,6 +42,7 @@ Python environment.
 2. Change to the directory `cd lagrangian-filtering`
 3. (Optional) Create the virtualenv `virtualenv env` and activate it `source env/bin/activate`
 4. Install the development version of the package `pip install -e .`
+5. Install the dependencies required for parcels `pip install -r requirements.txt`
 
 #### Upgrading
 With the package installed in development mode, updating is as easy as

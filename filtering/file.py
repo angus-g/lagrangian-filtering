@@ -140,20 +140,18 @@ class LagrangeParticleFile(object):
         """
 
         # don't write out deleted particles
-        if deleted_only:
+        if deleted_only is not False:
             return
 
         self._group.attrs["time"] = np.append(self._group.attrs["time"], time)
 
-        # find particles which have been deleted
-        missing = particleset.particle_data["state"] == ErrorCode.Delete
+        # indices of particles still alive
+        idx = particleset.particle_data["id"]
 
         for v, d in self._var_datasets.items():
-            # set data for deleted particles to nan, so the filtered output
-            # gets a nan to mark as invalid/missing
-            particleset.particle_data[v][missing] = np.nan
-
             # first, resize all datasets to add another entry in the time dimension
             # then we can just pull the array for this variable out of the particleset
             d.resize(d.shape[0] + 1, axis=0)
-            d[-1, :] = particleset.particle_data[v]
+            # data defaults to nans, and we only fill in the living particles
+            d[-1, :] = np.nan
+            d[-1, idx] = particleset.particle_data[v]

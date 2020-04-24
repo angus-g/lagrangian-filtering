@@ -463,7 +463,7 @@ class LagrangeFilter(object):
         """
 
         # reset the global particle ID counter so we can rely on particle IDs making sense
-        parcels.particle.lastID = 0
+        self.particleclass.setLastID(0)
 
         return parcels.ParticleSet(
             self.fieldset,
@@ -516,6 +516,9 @@ class LagrangeFilter(object):
             runtime=self.window_size,
             dt=self.advection_dt,
             output_file=outfile,
+            recovery={
+                parcels.ErrorCode.ErrorOutOfBounds: _recovery_kernel_out_of_bounds
+            },
         )
 
         # reseed particles back on the grid, then advect backwards
@@ -528,6 +531,9 @@ class LagrangeFilter(object):
             runtime=self.window_size,
             dt=-self.advection_dt,
             output_file=outfile,
+            recovery={
+                parcels.ErrorCode.ErrorOutOfBounds: _recovery_kernel_out_of_bounds
+            },
         )
 
         # stitch together and filter all sample variables from the temporary
@@ -876,6 +882,12 @@ def ParticleFactory(variables, name="SamplingParticle", BaseClass=parcels.JITPar
 
     newclass = type(name, (BaseClass,), var_dict)
     return newclass
+
+
+def _recovery_kernel_out_of_bounds(particle, fieldset, time):
+    """Recovery kernel for particle advection, to delete out-of-bounds particles."""
+
+    particle.state = parcels.ErrorCode.Delete
 
 
 def _zonally_periodic_BC(particle, fieldset, time):
