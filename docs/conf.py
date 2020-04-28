@@ -38,7 +38,12 @@ release = ""
 
 # use autodoc and documentation coverage extensions
 # napoleon lets us write docstrings in formats other than RST
-extensions = ["sphinx.ext.autodoc", "sphinx.ext.coverage", "sphinx.ext.napoleon"]
+extensions = [
+    "sphinx.ext.autodoc",
+    "sphinx.ext.coverage",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.intersphinx",
+]
 
 # Add any paths that contain templates here, relative to this directory.
 # templates_path = ['_templates']
@@ -186,3 +191,12 @@ epub_exclude_files = ["search.html"]
 
 
 # -- Extension configuration -------------------------------------------------
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "cftime": ("https://unidata.github.io/cftime/", None),
+    "dask": ("https://docs.dask.org/en/stable/", None),
+    "h5py": ("http://docs.h5py.org/en/stable/", None),
+    "numpy": ("https://numpy.org/doc/1.18/", None),
+    "parcels": ("http://oceanparcels.org/gh-pages/html/", None),
+    "xarray": ("http://xarray.pydata.org/en/stable/", None),
+}

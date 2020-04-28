@@ -70,26 +70,26 @@ class LagrangeFilter(object):
             the input data.
         dimensions (Dict[str, str]): A mapping from canonical dimension
             names to the dimension names in your data files.
-        sample_variables ([str]): A list of variable names that should be sampled
+        sample_variables (List[str]): A list of variable names that should be sampled
             into the Lagrangian frame of reference and filtered.
-        mesh (:obj:`str`, optional): The OceanParcels mesh type, either "flat"
+        mesh (Optional[str]): The OceanParcels mesh type, either "flat"
             or "spherical". "flat" meshes are expected to have dimensions
             in metres, and "spherical" meshes in degrees.
-        c_grid (:obj:`bool`, optional): Whether to interpolate velocity
+        c_grid (Optional[bool]): Whether to interpolate velocity
             components on an Arakawa C grid (defaults to no).
-        indices (:obj:`Dict[str, [int]]`, optional): An optional dictionary
+        indices (Optional[Dict[str, List[int]]]): An optional dictionary
             specifying the indices to which a certain dimension should
             be restricted.
-        uneven_window (:obj:`bool`, optional): Whether to allow different
+        uneven_window (Optional[bool]): Whether to allow different
             lengths for the forward and backward advection phases.
-        window_size (:obj:`float`, optional): The nominal length of the both
+        window_size (Optional[float]): The nominal length of the both
             the forward and backward advection windows, in seconds. A
             longer window may better capture the low-frequency signal to be
             removed.
-        highpass_frequency (:obj:`float`, optional): The 3dB cutoff frequency
+        highpass_frequency (Optional[float]): The 3dB cutoff frequency
             for filtering, below which spectral components will be
             attenuated. This should be an angular frequency, in [rad/s].
-        advection_dt (:obj:`datetime.timedelta`, optional): The timestep
+        advection_dt (Optional[datetime.timedelta]): The timestep
             to use for advection. May need to be adjusted depending on the
             resolution/frequency of your data.
 
@@ -251,7 +251,7 @@ class LagrangeFilter(object):
         computation time.
 
         Args:
-            complevel (:obj:`int`, optional): If specified as a value
+            complevel (Optional[int]): If specified as a value
                 from 1-9, this overrides the default compression level
                 (4 for the netCDF4 library).
         """
@@ -282,7 +282,7 @@ class LagrangeFilter(object):
         halo, this is incompatible with curvilinear grids.
 
         Args:
-            width (:obj:`int`, optional): The width of the halo,
+            width (Optional[int]): The width of the halo,
                 defaults to 5 (per parcels). This needs to be less
                 than half the number of points in the grid in the x
                 direction. This may need to be adjusted for small
@@ -350,7 +350,7 @@ class LagrangeFilter(object):
         halo, this is incompatible with curvilinear grids.
 
         Args:
-            width (:obj:`int`, optional): The width of the halo,
+            width (Optional[int]): The width of the halo,
                 defaults to 5 (per parcels). This needs to be less
                 than half the number of points in the grid in the y
                 direction. This may need to be adjusted for small
@@ -413,16 +413,16 @@ class LagrangeFilter(object):
         range will not be written, and will thus have a missing value.
 
         Args:
-            min_lon (:obj:`float`, optional): The lower bound on
+            min_lon (Optional[float]): The lower bound on
                 longitude for which to seed particles. If not specifed,
                 seed from the western edge of the domain.
-            max_lon (:obj:`float`, optional): The upper bound on
+            max_lon (Optional[float]): The upper bound on
                 longitude for which to seed particles. If not specifed,
                 seed from the easter edge of the domain.
-            min_lat (:obj:`float`, optional): The lower bound on
+            min_lat (Optional[float]): The lower bound on
                 latitude for which to seed particles. If not specifed,
                 seed from the southern edge of the domain.
-            max_lat (:obj:`float`, optional): The upper bound on
+            max_lat (Optional[float]): The upper bound on
                 latitude for which to seed particles. If not specifed,
                 seed from the northern edge of the domain.
 
@@ -457,7 +457,7 @@ class LagrangeFilter(object):
                 on this ParticleSet.
 
         Returns:
-            parcels.ParticleSet: A new ParticleSet containing a single particle
+            parcels.particleset.ParticleSet: A new ParticleSet containing a single particle
                 at every gridpoint, initialised at the specified time.
 
         """
@@ -482,7 +482,7 @@ class LagrangeFilter(object):
 
         Args:
             time (float): The point in time at which to calculate filtered data.
-            output_time (:obj:`bool`, optional): Whether to include "time" as
+            output_time (Optional[bool]): Whether to include "time" as
                 a numpy array in the output dictionary, for doing manual analysis.
 
         Note:
@@ -490,7 +490,7 @@ class LagrangeFilter(object):
             with the default filtering workflow, :func:`~filter_step`!
 
         Returns:
-            Dict[str, (int, dask.array)]: A dictionary of the advection
+            Dict[str, Tuple[int, dask.array.Array]]: A dictionary of the advection
                 data, mapping variable names to a pair. The first element is
                 the index of the sampled timestep in the data, and the
                 second element is a lazy dask array concatenating the forward
@@ -579,12 +579,12 @@ class LagrangeFilter(object):
         data is discarded).
 
         Args:
-            advection_data (Dict[str, (int, dask.array)]): A dictionary of
+            advection_data (Dict[str, Tuple[int, dask.array.Array]]): A dictionary of
                 particle advection data from a single timestep, returned
                 from :func:`~advection_step`.
 
         Returns:
-            Dict[str, dask.array]: A dictionary mapping sampled
+            Dict[str, dask.array.Array]: A dictionary mapping sampled
                 variable names to a 1D dask array containing the
                 filtered data at the specified time. This data is not
                 lazy, as it has already been computed out of the
@@ -635,19 +635,19 @@ class LagrangeFilter(object):
         Note:
             If `absolute` is True, the times must be the same datatype
             as those the input data. For dates with a calendar, this
-            is likely :obj:`np.datetime64` or :obj:`cftime.datetime`.
+            is likely :obj:`!numpy.datetime64` or :obj:`cftime.datetime`.
             For abstract times, this may simply be a number.
 
         Args:
-            times (:obj:`[float]`, optional): A list of timesteps at
+            times (Optional[List[float]]): A list of timesteps at
                 which to run the filtering. If this is omitted, all
                 timesteps that are fully covered by the filtering
                 window are selected.
-            clobber (:obj:`bool`, optional): Whether to overwrite any
+            clobber (Optional[bool]): Whether to overwrite any
                 existing output file with the same name as this
                 experiment. Default behaviour will not clobber an
                 existing output file.
-            absolute (:obj:`bool`, optional): If `times` is provided,
+            absolute (Optional[bool]): If `times` is provided,
                 this argument determines whether to interpret them
                 as relative to the first timestep in the input dataset
                 (False, default), or as absolute, following the actual
@@ -660,13 +660,13 @@ class LagrangeFilter(object):
     def create_out(self, clobber=False):
         """Create a netCDF dataset to hold filtered output.
 
-        Here we create a new ``netCDF4.Dataset`` for filtered
+        Here we create a new :obj:`!netCDF4.Dataset` for filtered
         output. For each sampled variable in the input files, a
         corresponding variable in created in the output file, with
         the same dimensions.
 
         Returns:
-            Tuple[netCDF4.Dataset, str]: A tuple containing a single
+            Tuple[:obj:`!netCDF4.Dataset`, str]: A tuple containing a single
                 dataset that will hold all filtered output and the
                 name of the time dimension in the output file.
 
@@ -868,13 +868,13 @@ def ParticleFactory(variables, name="SamplingParticle", BaseClass=parcels.JITPar
     variables on the base class.
 
     Args:
-        variables ([str]): A list of variable names which should be sampled.
+        variables (List[str]): A list of variable names which should be sampled.
         name (str): The name of the generated particle class.
-        BaseClass (Type[parcels.particle._Particle]): The base particles class upon
+        BaseClass (Type[:obj:`!parcels.particle._Particle`]): The base particles class upon
             which to append the required variables.
 
     Returns:
-        Type[parcels.particle._Particle]: The new particle class
+        Type[:obj:`!parcels.particle._Particle`]: The new particle class
 
     """
 

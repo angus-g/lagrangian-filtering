@@ -41,13 +41,13 @@ class LagrangeParticleFile(object):
         that causes an exception.
 
     Args:
-        particleset (:obj:`parcels.ParticleSet`): The particle set for which this file
+        particleset (parcels.particleset.ParticleSet): The particle set for which this file
             should cache advection data on disk. It's assumed the number of particles
             contained within the set does not change after initialisation.
-        outputdt (:obj:`float`, optional): The frequency at which advection data
+        outputdt (Optional[float]): The frequency at which advection data
             should be saved. If not specified, or infinite, the data will be saved
             at the first timestep only.
-        variables (:obj:`parcels.Variable`, optional): An explicit list subset of
+        variables (Optional[parcels.particle.Variable]): An explicit list subset of
             particletype variables to output. If not specified, all variables
             belonging to the particletype that are ``to_write`` are written.
 
@@ -109,7 +109,7 @@ class LagrangeParticleFile(object):
             group (str): The name of the group to retrieve.
 
         Returns:
-            h5py.group.Group: The group from the underlying HDF5 file.
+            :class:`h5py.Group <Group>`: The group from the underlying HDF5 file.
                 If the group hasn't been initialised with
                 :func:`~filtering.file.LagrangeParticleFile.set_group`,
                 it will be empty.
@@ -129,11 +129,11 @@ class LagrangeParticleFile(object):
         bounds, for example) are masked with NaN.
 
         Args:
-            particleset (parcels.ParticleSet): Particle set with data
+            particleset (parcels.particleset.ParticleSet): Particle set with data
                 to write to disk.
             time (float): Timestamp into particle execution at which this
                 write was called.
-            deleted_only (:obj:`bool`, optional): Whether to only write deleted
+            deleted_only (Optional[bool]): Whether to only write deleted
                 particles (does not do anything, only present for compatibility
                 with the call signature on the parcels version of the class).
 
