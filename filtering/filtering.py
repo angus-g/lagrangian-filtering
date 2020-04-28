@@ -666,9 +666,9 @@ class LagrangeFilter(object):
         the same dimensions.
 
         Returns:
-            netCDF4.Dataset: A single dataset that will hold all
-                filtered output.
-            str: The name of the time dimension in the output file.
+            Tuple[netCDF4.Dataset, str]: A tuple containing a single
+                dataset that will hold all filtered output and the
+                name of the time dimension in the output file.
 
         """
 
