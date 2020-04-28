@@ -12,6 +12,6 @@ jobs:
       name: "Unit Tests"
       script: pytest
     - stage: "Documentation"
-      install: pip install sphinx
+      before_install: pip install sphinx
       before_script: cd docs
-      script: make html
+      script: make html O=-nW
