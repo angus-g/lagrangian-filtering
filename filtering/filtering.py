@@ -59,15 +59,15 @@ class LagrangeFilter(object):
 
     Args:
         name (str): The name of the workflow
-        filenames (Dict[str, str]): A mapping from data variable names
-            to the files containing the data.
+        filenames_or_dataset (Union[Dict[str, str], xarray.Dataset]):
+            Either a mapping from data variable names to the files
+            containing the data, or an xarray Dataset containing the
+            input data.
 
             Filenames can contain globs if the data is spread across
             multiple files.
-        variables_or_data (Union[Dict[str, str], xarray.Dataset]): Either
-            a mapping from canonical variable names to the variable
-            names in your data files, or an xarray Dataset containing
-            the input data.
+        variables_or_data (Dict[str, str]): A mapping from canonical
+            variable names to the variable names in your data files.
         dimensions (Dict[str, str]): A mapping from canonical dimension
             names to the dimension names in your data files.
         sample_variables (List[str]): A list of variable names that should be sampled
@@ -664,6 +664,12 @@ class LagrangeFilter(object):
         output. For each sampled variable in the input files, a
         corresponding variable in created in the output file, with
         the same dimensions.
+
+        Args:
+            clobber (Optional[bool]): Whether to overwrite any
+                existing output file with the same name as this
+                experiment. Default behaviour will not clobber an
+                existing output file.
 
         Returns:
             Tuple[:obj:`!netCDF4.Dataset`, str]: A tuple containing a single
