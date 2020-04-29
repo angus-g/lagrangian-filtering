@@ -66,7 +66,7 @@ class LagrangeFilter(object):
 
             Filenames can contain globs if the data is spread across
             multiple files.
-        variables_or_data (Dict[str, str]): A mapping from canonical
+        variables (Dict[str, str]): A mapping from canonical
             variable names to the variable names in your data files.
         dimensions (Dict[str, str]): A mapping from canonical dimension
             names to the dimension names in your data files.
