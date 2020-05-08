@@ -7,17 +7,18 @@ library.
 
 """
 
-import dask.array as da
-import numpy as np
 from datetime import timedelta
 from glob import iglob
+
+import cftime
+import dask.array as da
+import netCDF4
+import numpy as np
 import parcels
 from scipy import signal
-import netCDF4
 import xarray as xr
-import cftime
 
-from .file import LagrangeParticleFile
+from filtering.file import LagrangeParticleFile
 
 
 class LagrangeFilter(object):
@@ -159,6 +160,7 @@ class LagrangeFilter(object):
             mesh=mesh,
             **fieldset_kwargs,
         )
+
         # save the lon/lat on which to seed particles
         # this is saved here because if the grid is later made periodic, the
         # underlying grids will be modified, and we'll seed particles in the halos

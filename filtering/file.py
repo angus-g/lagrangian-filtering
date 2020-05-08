@@ -6,9 +6,10 @@ called is determined by the ``outputdt`` property.
 
 """
 
-import numpy as np
-import h5py
 import tempfile
+
+import h5py
+import numpy as np
 from parcels import ErrorCode
 
 

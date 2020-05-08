@@ -5,4 +5,4 @@ try:
 except DistributionNotFound:
     pass
 
-from .filtering import LagrangeFilter
+from filtering.filtering import LagrangeFilter
