@@ -9,6 +9,7 @@ library.
 
 from datetime import timedelta
 from glob import iglob
+import logging
 
 import cftime
 import dask.array as da
@@ -161,26 +162,16 @@ class LagrangeFilter(object):
             **fieldset_kwargs,
         )
 
+        logging.warning(
+            "Seeding particles on the same grid as '%s'. "
+            "You can change this with .set_particle_grid()",
+            self.fieldset.get_fields()[0].name,
+        )
+
         # save the lon/lat on which to seed particles
         # this is saved here because if the grid is later made periodic, the
         # underlying grids will be modified, and we'll seed particles in the halos
-        if self.fieldset.gridset.grids[0].gtype in [
-            parcels.GridCode.CurvilinearZGrid,
-            parcels.GridCode.CurvilinearSGrid,
-        ]:
-            self._curvilinear = True
-            self._grid_lon = self.fieldset.gridset.grids[0].lon
-            self._grid_lat = self.fieldset.gridset.grids[0].lat
-        else:
-            self._curvilinear = False
-            self._grid_lon, self._grid_lat = np.meshgrid(
-                self.fieldset.gridset.grids[0].lon, self.fieldset.gridset.grids[0].lat
-            )
-
-        # save the original grid to allow subdomain seeding
-        self._orig_grid = self._grid_lon, self._grid_lat
-        # mask off output
-        self._grid_mask = np.ones_like(self._grid_lon, dtype=np.bool)
+        self._set_grid(self.fieldset.gridset.grids[0])
 
         # starts off non-periodic
         self._is_zonally_periodic = False
@@ -216,6 +207,25 @@ class LagrangeFilter(object):
 
         # options (compression, etc.) for creating output variables
         self._output_variable_kwargs = {}
+
+    def _set_grid(self, grid):
+        """Set the seeding grid from a parcels grid"""
+
+        if grid.gtype in [
+            parcels.GridCode.CurvilinearZGrid,
+            parcels.GridCode.CurvilinearSGrid,
+        ]:
+            self._curvilinear = True
+            self._grid_lon = grid.lon
+            self._grid_lat = grid.lat
+        else:
+            self._curvilinear = False
+            self._grid_lon, self._grid_lat = np.meshgrid(grid.lon, grid.lat)
+
+        # save the original grid to allow subdomain seeding
+        self._orig_grid = self._grid_lon, self._grid_lat
+        # mask off output
+        self._grid_mask = np.ones_like(self._grid_lon, dtype=np.bool)
 
     def _create_sample_kernel(self, sample_variables):
         """Create the parcels kernel for sampling fields during advection."""
@@ -267,6 +277,34 @@ class LagrangeFilter(object):
             self._output_variable_kwargs["complevel"] = complevel
 
         self._output_variable_kwargs["zlib"] = True
+
+    def set_particle_grid(self, field):
+        """Set the grid for the sampling particles by choosing a field.
+
+        By default, particles are seeded on the gridpoints of the
+        first field in the Parcels FieldSet (usually U velocity). To
+        use another grid, such as a tracer grid, pass the relevant
+        field name to this function. This field name should be in
+        Parcels-space, i.e. the keys in the ``variables`` dictionary.
+
+        Note:
+            Because we get the particle grid from the Parcels gridset,
+            and changing halos alters the underlying grids, this needs
+            to be called before :func:`~make_zonally_periodic` or
+            :func:`~make_meridionally_periodic`.
+
+        Args:
+            field (str): The name of the field whose grid to use for particles.
+
+        """
+
+        if self._is_zonally_periodic or self._is_meridionally_periodic:
+            raise Exception("grid must be set before making domain periodic")
+
+        if not hasattr(self.fieldset, field):
+            raise ValueError(f"{field} is not a valid field name")
+
+        self._set_grid(getattr(self.fieldset, field).grid)
 
     def make_zonally_periodic(self, width=None):
         """Mark the domain as zonally periodic.
