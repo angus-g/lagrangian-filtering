@@ -26,7 +26,7 @@ def simple_dataset():
     return d
 
 
-def test_single_file(tmp_path, simple_dataset):
+def test_single_file(tmp_path, simple_dataset, nocompile_LagrangeFilter):
     """Test creation of output file from a single input file."""
 
     # because filtering puts files in the current directory, we need to change
@@ -38,7 +38,7 @@ def test_single_file(tmp_path, simple_dataset):
     simple_dataset.to_netcdf(p)
 
     # create class
-    f = filtering.LagrangeFilter(
+    f = nocompile_LagrangeFilter(
         "single_file",
         {"U": p, "V": p},
         {"U": "U", "V": "V"},
@@ -61,7 +61,7 @@ def test_single_file(tmp_path, simple_dataset):
     assert "var_V" not in d.variables
 
 
-def test_xarray_input(tmp_path, simple_dataset):
+def test_xarray_input(tmp_path, simple_dataset, nocompile_LagrangeFilter):
     """Test creation of output file from an xarray dataset."""
 
     # because filtering puts files in the current directory, we need to change
@@ -69,7 +69,7 @@ def test_xarray_input(tmp_path, simple_dataset):
     os.chdir(tmp_path)
 
     # create class
-    f = filtering.LagrangeFilter(
+    f = nocompile_LagrangeFilter(
         "xarray_input",
         simple_dataset,
         {"U": "U", "V": "V"},
@@ -92,12 +92,12 @@ def test_xarray_input(tmp_path, simple_dataset):
     assert "var_V" not in d.variables
 
 
-def test_time_dim(tmp_path, simple_dataset):
+def test_time_dim(tmp_path, simple_dataset, nocompile_LagrangeFilter):
     """Test the correct time dimension is returned from the input file."""
 
     os.chdir(tmp_path)
 
-    f = filtering.LagrangeFilter(
+    f = nocompile_LagrangeFilter(
         "time_dim",
         simple_dataset,
         {"U": "U", "V": "V"},
@@ -111,7 +111,7 @@ def test_time_dim(tmp_path, simple_dataset):
     assert time_dim == "time"
 
 
-def test_clobber(tmp_path, simple_dataset):
+def test_clobber(tmp_path, simple_dataset, nocompile_LagrangeFilter):
     """Test whether existing output files are clobbered."""
 
     os.chdir(tmp_path)
@@ -122,7 +122,7 @@ def test_clobber(tmp_path, simple_dataset):
     simple_dataset.to_netcdf(p)
 
     # create filter
-    f = filtering.LagrangeFilter(
+    f = nocompile_LagrangeFilter(
         "clobbering",
         {"U": p, "V": p},
         {"U": "U", "V": "V"},
@@ -146,7 +146,7 @@ def test_clobber(tmp_path, simple_dataset):
     assert out_path.exists()
 
 
-def test_multiple_files(tmp_path, simple_dataset):
+def test_multiple_files(tmp_path, simple_dataset, nocompile_LagrangeFilter):
     """Test creation of output file from multiple input files."""
 
     os.chdir(tmp_path)
@@ -156,7 +156,7 @@ def test_multiple_files(tmp_path, simple_dataset):
     simple_dataset.U.to_netcdf(pu)
     simple_dataset.V.to_netcdf(pv)
 
-    f = filtering.LagrangeFilter(
+    f = nocompile_LagrangeFilter(
         "multiple_files",
         {"U": pu, "V": pv},
         {"U": "U", "V": "V"},
@@ -175,7 +175,7 @@ def test_multiple_files(tmp_path, simple_dataset):
     assert "var_V" not in d.variables
 
 
-def test_dimension_files(tmp_path):
+def test_dimension_files(tmp_path, nocompile_LagrangeFilter):
     """Test creation of output file where input variables pull dimensions
     from different files.
 
@@ -218,7 +218,7 @@ def test_dimension_files(tmp_path):
     dd = fd.copy()
     dd["data"] = pdata
 
-    f = filtering.LagrangeFilter(
+    f = nocompile_LagrangeFilter(
         "dimension_files",
         {"U": fd, "V": fd, "UBAR": dd, "VBAR": dd},
         {"U": "U", "V": "V", "UBAR": "UBAR", "VBAR": "VBAR"},
@@ -239,7 +239,7 @@ def test_dimension_files(tmp_path):
     assert d["var_UBAR"].dims == ("time", "lat", "lon")
 
 
-def test_dims_indices_dicts(tmp_path):
+def test_dims_indices_dicts(tmp_path, nocompile_LagrangeFilter):
     """Test creation of output file where dimensions and indices are specified in
     per-variable dictionaries, instead of globally."""
 
@@ -280,7 +280,7 @@ def test_dims_indices_dicts(tmp_path):
         "VBAR": {"depth": [0]},
     }
 
-    f = filtering.LagrangeFilter(
+    f = nocompile_LagrangeFilter(
         "dims_indices_dicts",
         {v: p for v in ["U", "V", "UBAR", "VBAR"]},
         {"U": "UVEL", "V": "VVEL", "UBAR": "UBAR", "VBAR": "VBAR"},
@@ -295,7 +295,7 @@ def test_dims_indices_dicts(tmp_path):
     assert out.exists()
 
 
-def test_other_data(tmp_path, simple_dataset):
+def test_other_data(tmp_path, simple_dataset, nocompile_LagrangeFilter):
     """Test creation of output file where a non-velocity variable is sampled."""
 
     os.chdir(tmp_path)
@@ -303,7 +303,7 @@ def test_other_data(tmp_path, simple_dataset):
     simple_dataset["P"] = (["time", "lat", "lon"], np.empty((3, 4, 5)))
     simple_dataset.to_netcdf(p)
 
-    f = filtering.LagrangeFilter(
+    f = nocompile_LagrangeFilter(
         "other_data",
         {"U": p, "V": p, "P": p},
         {"U": "U", "V": "V", "P": "P"},
@@ -320,7 +320,7 @@ def test_other_data(tmp_path, simple_dataset):
     assert "var_P" in d.variables
 
 
-def test_staggered(tmp_path):
+def test_staggered(tmp_path, nocompile_LagrangeFilter):
     """Test creation of output file where velocity is staggered."""
 
     os.chdir(tmp_path)
@@ -345,7 +345,7 @@ def test_staggered(tmp_path):
     # variables
     v = ["U", "V", "P"]
 
-    f = filtering.LagrangeFilter(
+    f = nocompile_LagrangeFilter(
         "staggered",
         {k: p for k in v},
         {k: k for k in v},
@@ -367,7 +367,7 @@ def test_staggered(tmp_path):
         assert f"var_{n}" in d.variables
 
 
-def test_curvilinear(tmp_path):
+def test_curvilinear(tmp_path, nocompile_LagrangeFilter):
     """Test creation of output file where grid is curvilinear."""
 
     os.chdir(tmp_path)
@@ -384,7 +384,7 @@ def test_curvilinear(tmp_path):
     )
     d.to_netcdf(p)
 
-    f = filtering.LagrangeFilter(
+    f = nocompile_LagrangeFilter(
         "curvilinear",
         {"U": p, "V": p},
         {"U": "U", "V": "V"},
@@ -404,10 +404,10 @@ def test_curvilinear(tmp_path):
     assert d["lat"].dims == ("eta", "xi")
 
 
-def test_valid_complevel(simple_dataset):
+def test_valid_complevel(simple_dataset, nocompile_LagrangeFilter):
     """Test setting compression levels for output."""
 
-    f = filtering.LagrangeFilter(
+    f = nocompile_LagrangeFilter(
         "valid_complevel",
         simple_dataset,
         {"U": "U", "V": "V"},
@@ -431,12 +431,12 @@ def test_valid_complevel(simple_dataset):
     assert f._output_variable_kwargs == {"zlib": True, "complevel": 5}
 
 
-def test_compression_setting(tmp_path, simple_dataset):
+def test_compression_setting(tmp_path, simple_dataset, nocompile_LagrangeFilter):
     """Test whether compression is enabled if it's requested."""
 
     os.chdir(tmp_path)
 
-    f = filtering.LagrangeFilter(
+    f = nocompile_LagrangeFilter(
         "compression",
         simple_dataset,
         {"U": "U", "V": "V"},

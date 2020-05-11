@@ -69,12 +69,12 @@ def parcels_args(dimensions_grid):
     return arg_tuple + (c_grid,)
 
 
-def test_particleset_default_particle_locations(parcels_args):
+def test_particleset_default_particle_locations(parcels_args, nocompile_LagrangeFilter):
     """Test that particles end up at the U-grid gridpoints by default"""
 
     dataset, variables, dimensions, c_grid = parcels_args
 
-    f = filtering.LagrangeFilter(
+    f = nocompile_LagrangeFilter(
         "test", dataset, variables, dimensions, sample_variables=["T"], c_grid=c_grid
     )
 
@@ -92,12 +92,14 @@ def test_particleset_default_particle_locations(parcels_args):
     assert np.array_equal(ps.lat, out_lat.flatten())
 
 
-def test_particleset_periodic_particle_locations(parcels_args):
+def test_particleset_periodic_particle_locations(
+    parcels_args, nocompile_LagrangeFilter
+):
     """Test that particle locations aren't changed by a periodic grid."""
 
     dataset, variables, dimensions, c_grid = parcels_args
 
-    f = filtering.LagrangeFilter(
+    f = nocompile_LagrangeFilter(
         "test", dataset, variables, dimensions, sample_variables=["T"], c_grid=c_grid
     )
 
@@ -118,12 +120,12 @@ def test_particleset_periodic_particle_locations(parcels_args):
 
 
 @pytest.mark.parametrize("direction", ["zonal", "meridional"])
-def test_set_grid_after_periodic(parcels_args, direction):
+def test_set_grid_after_periodic(parcels_args, direction, nocompile_LagrangeFilter):
     """Test that we can't change the particle grid after making the domain periodic."""
 
     dataset, variables, dimensions, c_grid = parcels_args
 
-    f = filtering.LagrangeFilter(
+    f = nocompile_LagrangeFilter(
         "test", dataset, variables, dimensions, sample_variables=["T"], c_grid=c_grid
     )
 
@@ -139,12 +141,12 @@ def test_set_grid_after_periodic(parcels_args, direction):
 
 
 @pytest.mark.parametrize("direction", ["zonal", "meridional"])
-def test_periodic_after_set_grid(parcels_args, direction):
+def test_periodic_after_set_grid(parcels_args, direction, nocompile_LagrangeFilter):
     """Test that the underlying grid respects the set grid when made periodic."""
 
     dataset, variables, dimensions, c_grid = parcels_args
 
-    f = filtering.LagrangeFilter(
+    f = nocompile_LagrangeFilter(
         "test", dataset, variables, dimensions, sample_variables=["T"], c_grid=c_grid
     )
     f.set_particle_grid("T")
@@ -164,12 +166,12 @@ def test_periodic_after_set_grid(parcels_args, direction):
         raise ValueError("unexpected direction")
 
 
-def test_set_grid_wrong_name(parcels_args):
+def test_set_grid_wrong_name(parcels_args, nocompile_LagrangeFilter):
     """Test that we raise an error if we try to set the grid from an invalid field."""
 
     dataset, variables, dimensions, c_grid = parcels_args
 
-    f = filtering.LagrangeFilter(
+    f = nocompile_LagrangeFilter(
         "test", dataset, variables, dimensions, sample_variables=["T"], c_grid=c_grid
     )
 
@@ -177,12 +179,14 @@ def test_set_grid_wrong_name(parcels_args):
         f.set_particle_grid("INVALID")
 
 
-def test_particleset_set_grid_particle_locations(parcels_args):
+def test_particleset_set_grid_particle_locations(
+    parcels_args, nocompile_LagrangeFilter
+):
     """Test that set_grid changes where particles are spawned."""
 
     dataset, variables, dimensions, c_grid = parcels_args
 
-    f = filtering.LagrangeFilter(
+    f = nocompile_LagrangeFilter(
         "test", dataset, variables, dimensions, sample_variables=["T"], c_grid=c_grid
     )
     f.set_particle_grid("T")
@@ -197,14 +201,14 @@ def test_particleset_set_grid_particle_locations(parcels_args):
     assert np.array_equal(ps.lat, out_lat.flatten())
 
 
-def test_minwindow_size():
+def test_minwindow_size(nocompile_LagrangeFilter):
     """Test that the minimum window size is set correctly."""
 
     dataset, variables, dimensions = parcels_arg_tuple(a_grid)
     # set output dt to be one day in seconds
     dataset["time"] = np.array([0, 3600 * 24])
 
-    f = filtering.LagrangeFilter(
+    f = nocompile_LagrangeFilter(
         "test",
         dataset,
         variables,
