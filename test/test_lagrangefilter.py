@@ -131,6 +131,32 @@ def test_set_grid_after_periodic(parcels_args, direction):
         f.set_particle_grid("T")
 
 
+@pytest.mark.parametrize("direction", ["zonal", "meridional"])
+def test_periodic_after_set_grid(parcels_args, direction):
+    """Test that the underlying grid respects the set grid when made periodic."""
+
+    dataset, variables, dimensions, c_grid = parcels_args
+
+    f = filtering.LagrangeFilter(
+        "test", dataset, variables, dimensions, sample_variables=["T"], c_grid=c_grid
+    )
+    f.set_particle_grid("T")
+
+    x = dataset[dataset.T.dims[-1]]
+    y = dataset[dataset.T.dims[-2]]
+
+    if direction == "zonal":
+        f.make_zonally_periodic(width=1)
+        assert f.fieldset.halo_west == x[0]
+        assert f.fieldset.halo_east == x[-1]
+    elif direction == "meridional":
+        f.make_meridionally_periodic(width=1)
+        assert f.fieldset.halo_north == y[-1]
+        assert f.fieldset.halo_south == y[0]
+    else:
+        raise ValueError("unexpected direction")
+
+
 def test_set_grid_wrong_name(parcels_args):
     """Test that we raise an error if we try to set the grid from an invalid field."""
 

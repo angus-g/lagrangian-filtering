@@ -162,10 +162,11 @@ class LagrangeFilter(object):
             **fieldset_kwargs,
         )
 
+        self._output_field = self.fieldset.get_fields()[0].name
         logging.warning(
-            "Seeding particles on the same grid as '%s'. "
+            "Seeding particles and output times on the same grid as '%s'. "
             "You can change this with .set_particle_grid()",
-            self.fieldset.get_fields()[0].name,
+            self._output_field,
         )
 
         # save the lon/lat on which to seed particles
@@ -177,17 +178,10 @@ class LagrangeFilter(object):
         self._is_zonally_periodic = False
         self._is_meridionally_periodic = False
 
-        # guess the output timestep
-        times = self.fieldset.gridset.grids[0].time
-        self.output_dt = times[1] - times[0]
-
-        # create the filter - use a 4th order Butterworth for the moment
-        # make sure to convert angular frequency back to linear for passing to the
-        # filter constructor
-        fs = 1.0 / self.output_dt
-        self.inertial_filter = signal.butter(
-            4, highpass_frequency / (2 * np.pi), "highpass", fs=fs
-        )
+        # guess the output timestep from the seed grid
+        self.output_dt = self._output_grid.time[1] - self._output_grid.time[0]
+        self.filter_frequency = highpass_frequency
+        self.inertial_filter = None
 
         # timestep for advection
         self.advection_dt = advection_dt
@@ -226,6 +220,17 @@ class LagrangeFilter(object):
         self._orig_grid = self._grid_lon, self._grid_lat
         # mask off output
         self._grid_mask = np.ones_like(self._grid_lon, dtype=np.bool)
+        # save grid timesteps
+        self._output_grid = grid
+
+    def _create_filter(self):
+        """Create the inertial filter for output."""
+
+        # create the filter - use a 4th order Butterworth for the moment
+        # make sure to convert angular frequency back to linear for passing to the
+        # filter constructor
+        fs = 1.0 / self.output_dt
+        return signal.butter(4, self.filter_frequency / (2 * np.pi), "highpass", fs=fs)
 
     def _create_sample_kernel(self, sample_variables):
         """Create the parcels kernel for sampling fields during advection."""
@@ -305,6 +310,7 @@ class LagrangeFilter(object):
             raise ValueError(f"{field} is not a valid field name")
 
         self._set_grid(getattr(self.fieldset, field).grid)
+        self._output_field = field
 
     def make_zonally_periodic(self, width=None):
         """Mark the domain as zonally periodic.
@@ -349,8 +355,8 @@ class LagrangeFilter(object):
 
         # add constants that are accessible within the kernel denoting the
         # edges of the halo region
-        self.fieldset.add_constant("halo_west", self.fieldset.gridset.grids[0].lon[0])
-        self.fieldset.add_constant("halo_east", self.fieldset.gridset.grids[0].lon[-1])
+        self.fieldset.add_constant("halo_west", self._output_grid.lon[0])
+        self.fieldset.add_constant("halo_east", self._output_grid.lon[-1])
 
         if width is None:
             self.fieldset.add_periodic_halo(zonal=True)
@@ -417,8 +423,8 @@ class LagrangeFilter(object):
 
         # add constants that are accessible within the kernel denoting the
         # edges of the halo region
-        self.fieldset.add_constant("halo_north", self.fieldset.gridset.grids[0].lat[-1])
-        self.fieldset.add_constant("halo_south", self.fieldset.gridset.grids[0].lat[0])
+        self.fieldset.add_constant("halo_north", self._output_grid.lat[-1])
+        self.fieldset.add_constant("halo_south", self._output_grid.lat[0])
 
         if width is None:
             self.fieldset.add_periodic_halo(meridional=True)
@@ -529,6 +535,13 @@ class LagrangeFilter(object):
             If ``output_time`` is True, the output object will not be compatible
             with the default filtering workflow, :func:`~filter_step`!
 
+            If ``output_dt`` has not been set on the filtering object,
+            it will default to the difference between successive time
+            steps in the first grid defined in the parcels
+            FieldSet. This may be a concern if using data which has
+            been sampled at different frequencies in the input data
+            files.
+
         Returns:
             Dict[str, Tuple[int, dask.array.Array]]: A dictionary of the advection
                 data, mapping variable names to a pair. The first element is
@@ -618,6 +631,10 @@ class LagrangeFilter(object):
         origin point (i.e. the filtered forward and backward advection
         data is discarded).
 
+        Note:
+            If an inertial filter object hasn't been attached before
+            this function is called, one will automatically be created.
+
         Args:
             advection_data (Dict[str, Tuple[int, dask.array.Array]]): A dictionary of
                 particle advection data from a single timestep, returned
@@ -631,6 +648,11 @@ class LagrangeFilter(object):
                 temporary advection data.
 
         """
+
+        # we need a filter for this step, so create the default filter
+        # if necessary
+        if self.inertial_filter is None:
+            self.inertial_filter = self._create_filter()
 
         da_out = {}
         for v, a in advection_data.items():
@@ -703,7 +725,7 @@ class LagrangeFilter(object):
         Here we create a new :obj:`!netCDF4.Dataset` for filtered
         output. For each sampled variable in the input files, a
         corresponding variable in created in the output file, with
-        the same dimensions.
+        the dimensions of the output grid.
 
         Args:
             clobber (Optional[bool]): Whether to overwrite any
@@ -774,60 +796,30 @@ class LagrangeFilter(object):
             # return the dimension name, handling the curvilinear grid case
             return ds_orig.dims[1 if len(ds_orig.dims) > 1 and dim == "lon" else 0]
 
+        # get the output field
+        v_output = self._variables.get(self._output_field, self._output_field)
+
+        # get the relevant dimensions dictionary
+        if self._output_field in self._dimensions:
+            dims = self._dimensions[self._output_field]
+        else:
+            dims = self._dimensions
+
+        # create dimensions in the output file for those on the output field
+        out_dims = {}
+        for d in ["time", "lat", "lon"]:
+            out_dims[d] = create_dimension(dims, d, self._output_field)
+
+        # save time dimension name for correct conversion
+        time_dim = out_dims["time"]
+
         for v in self._sample_variables:
             # translate if required (parcels -> file convention)
             v_orig = self._variables.get(v, v)
 
-            # open all the relevant files for this variable
-            if isinstance(self._filenames, xr.Dataset):
-                ds_orig = self._filenames[v_orig]
-            else:
-                if isinstance(self._filenames[v], dict):
-                    # variable -> dictionary (for separate coordinate files)
-                    filename = self._filenames[v]["data"]
-                else:
-                    # otherwise, we just have a plain variable -> file mapping
-                    filename = self._filenames[v]
-
-                # globs can give us a list, but we only need the first item
-                # to get the metadata
-                if isinstance(filename, list):
-                    filename = filename[0]
-
-                ds_orig = xr.open_dataset(next(iglob(filename)))[v_orig]
-
-            # are dimensions defined specifically for this variable?
-            if v in self._dimensions:
-                dims = self._dimensions[v]
-            else:
-                dims = self._dimensions
-
-            # are indices defined specifically for this variable?
-            if v in self._indices:
-                indices = self._indices[v]
-            else:
-                indices = self._indices
-
-            # translate to variable names from the source files
-            indices = {dims[v]: ind for v, ind in indices.items()}
-
-            # select only the relevant indices
-            # in particular, squeeze to drop z dimension if we index it out
-            local_indices = {k: v for k, v in indices.items() if k in ds_orig.dims}
-            ds_orig = ds_orig.isel(**local_indices).squeeze()
-
-            # for each dimension, create it if it doesn't already exist
-            # in the output file, and copy across its data
-            out_dims = {}
-            for d in ["time", "lat", "lon"]:
-                out_dims[d] = create_dimension(dims, d, v)
-
-            if time_dim is None:
-                time_dim = out_dims["time"]
-
             # create the variable in the dataset itself
             ds.createVariable(
-                "var_" + v,
+                f"var_{v}",
                 "float32",
                 dimensions=(out_dims["time"], out_dims["lat"], out_dims["lon"]),
                 **self._output_variable_kwargs,
@@ -841,13 +833,13 @@ class LagrangeFilter(object):
 
         """
 
-        tgrid = self.fieldset.gridset.grids[0].time
+        tgrid = self._output_grid.time
 
         if times is None:
             times = tgrid.copy()
 
         if absolute:
-            times = self.fieldset.gridset.grids[0].time_origin.reltime(times)
+            times = self._output_grid.time_origin.reltime(times)
 
         times = np.array(times)
         window_left = times - tgrid[0] >= self.window_size

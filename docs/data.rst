@@ -152,3 +152,33 @@ in order to work correctly. More detail is available in the `indexing
 documentation`_.
 
 .. _indexing documentation: https://nbviewer.jupyter.org/github/OceanParcels/parcels/blob/master/parcels/examples/documentation_indexing.ipynb
+
+
+Output grid
+===========
+
+The underlying :doc:`algorithm <algorithm>` involves seeding particles
+at all gridpoints in order to sample the fields of interest. With the
+potential staggering mentioned above in mind, this could mean running
+the filtering advection with three times the number of
+points. Additionally, we can specify variables on arbitrary grids to
+be sampled by the velocity data, which could increase the advection
+time and memory consumption further. Instead, we anticipate a given
+filtering workflow will seed particles on a single grid, leveraging
+interpolation for other staggering schemes.
+
+By default, the first grid defined within the OceanParcels
+:py:class:`~parcels.fieldset.FieldSet` will be used for seeding the
+filtering particles, and therefore as the final location of the
+filtered data. Usually, this will be the ``U`` velocity field, but the
+:py:func:`~filtering.filtering.LagrangeFilter.set_particle_grid`
+method can be used to modify this after creation of the filtering
+object. This looks up a field by name from OceanParcels, and as such
+needs to be called with a variable in the keys of the ``variables``
+dictionary, as opposed to the variable name within your data
+files. Using the example variable data from before, to set particle
+seeding and output on the *rho* grid::
+
+  variables = {"U": "UVEL", "V": "VVEL", "P": "PHIHYD", "RHO": "RHOAnoma"}
+  f = LagrangeFilter(...)
+  f.set_particle_grid("RHO")
