@@ -62,6 +62,10 @@ class LagrangeParticleFile(object):
         self._tempfile = tempfile.NamedTemporaryFile(dir=".", suffix=".h5")
         self.h5file = h5py.File(self._tempfile, "w")
 
+        # using upstream parcels, it'll try to read this attribute
+        # when advection is taking longer than 10 seconds
+        self.tempwritedir_base = self._tempfile.name
+
         # variable -> dtype map for creating datasets
         self._vars = {}
 
