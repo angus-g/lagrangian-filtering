@@ -197,6 +197,11 @@ class LagrangeFilter(object):
         # create the particle class and kernel for sampling
         # map sampled variables to fields
         self.particleclass = ParticleFactory(sample_variables)
+        # if we're using cgrid, we need to set the lon/lat dtypes to 64-bit,
+        # otherwise things get reordered when we create the particleclass
+        if c_grid:
+            self.particleclass.set_lonlatdepth_dtype(np.float64)
+
         self._create_sample_kernel(sample_variables)
         self.kernel = parcels.AdvectionRK4 + self.sample_kernel
 
