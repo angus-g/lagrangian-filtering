@@ -48,10 +48,37 @@ only using two-dimensional data::
     "V": {"lat": "mask.nc", "lon": "mask.nc", "depth": "depth.nc", "data": "v_velocity.nc"},
   }
 
+Dataset input
+-------------
+
 As an alternative to passing filenames, an ``xarray`` dataset can be
-given to the ``filenames_or_dataset`` argument. This is probably more
-useful when using synthetic data, without requiring that it first be
-written to a file.
+given to the ``filenames_or_dataset`` argument. One use for this
+functionality is to provide synthetic data, without requiring that it
+first be written to a file.
+
+Another use for dataset input is to provide more flexibility with your
+input data. In particular, you are able to leverage ``dask`` for
+on-the-fly computations, such as the :ref:`dynamic data masking
+example <masking example>`. Note that the default behaviour of
+:py:func:`xarray.open_dataset` is to use a single chunk for a
+file. For large datasets, this will both take an extremely long time,
+and use an excessive amount of memory. Ensure the dataset is opened
+with a sensible ``chunks`` dictionary.
+
+A complication that comes up when using data from a dataset is that we
+don't handle some forms of datetime object particularly well. This is
+especially the case when using a standard or proleptic Gregorian
+calendar, which loads with a numpy-specific datetime object. In these
+cases, tell ``xarray`` not to decode the time data into these objects
+by passing ``use_cftime=True``.
+
+Finally, your data is likely to be spread across multiple files, with
+different dimension names for variables. The different mapping for
+grid data isn't possible with dataset input, so you will have to
+combine multiple datasets with :py:func:`xarray.merge`. Other useful
+functions for massaging your data into a conforming format are
+demonstrated in the :ref:`loading data through xarray example <xarray
+example>`.
 
 
 Variables dictionary
