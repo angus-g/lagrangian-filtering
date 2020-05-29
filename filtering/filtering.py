@@ -898,7 +898,7 @@ class LagrangeFilter(object):
 
         t = self.fieldset.time_origin.fulltime(t)
 
-        if "units" not in ds[dim].ncattrs():
+        if "units" not in ds[dim].ncattrs() or "calendar" not in ds[dim].ncattrs():
             return t
 
         # use cftime to convert seconds back to the date-relevant number
