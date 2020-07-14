@@ -964,7 +964,7 @@ def ParticleFactory(variables, name="SamplingParticle", BaseClass=parcels.JITPar
 def _recovery_kernel_out_of_bounds(particle, fieldset, time):
     """Recovery kernel for particle advection, to delete out-of-bounds particles."""
 
-    particle.state = parcels.ErrorCode.Delete
+    particle.state = parcels.OperationCode.Delete
 
 
 def _zonally_periodic_BC(particle, fieldset, time):
