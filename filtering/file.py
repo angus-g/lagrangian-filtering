@@ -48,7 +48,7 @@ class LagrangeParticleFile(object):
         outputdt (Optional[float]): The frequency at which advection data
             should be saved. If not specified, or infinite, the data will be saved
             at the first timestep only.
-        variables (Optional[parcels.particle.Variable]): An explicit list subset of
+        variables (Optional[List[parcels.particle.Variable]]): An explicit list subset of
             particletype variables to output. If not specified, all variables
             belonging to the particletype that are ``to_write`` are written.
 
@@ -160,3 +160,120 @@ class LagrangeParticleFile(object):
             # data defaults to nans, and we only fill in the living particles
             d[-1, :] = np.nan
             d[-1, idx] = particleset.particle_data[v]
+
+
+class LagrangeParticleArray(object):
+    """A ParticleFile for in-memory caching of advected data.
+
+    For smaller spatial extents, or sufficient memory, it is easier to
+    work with in-memory arrays to cache advection data.
+
+    Important:
+        This requires a bit more management than
+        :class:`~filtering.file.LagrangeParticleFile`: after forward
+        advection, reverse the data with
+        :func:`~filtering.file.LagrangeParticleArray.reverse_data`
+        then skip the first output of backward advection (the sampling
+        of initial particle positions) with
+        :func:`~filtering.file.LagrangeParticleArray.set_skip`.
+
+    Args:
+        particleset (parcels.particleset.ParticleSet): The particle set
+            for which advection data will be cached. We use this to get
+            the names and types of sampled variables.
+        outputdt (Optional[float]): The frequency at which advection data
+            should be saved. If not specified, or infinite, the data will
+            be saved at the first timestep only.
+        variables (Optional[List[parcels.particle.Variable]]): An explicit
+            subset of variables to output. If not specified, all
+            variables belonging to the particleset's particletype that
+            are ``to_write`` are written.
+
+    """
+
+    def __init__(self, particleset, outputdt=np.infty, variables=None):
+        self.outputdt = outputdt
+        self.n = len(particleset)
+        self.skip = 0
+
+        # parcels will read this attribute for printing a message
+        self.tempwritedir_base = "<nonexistent>"
+
+        # dictionary containing cached arrays for each variable
+        self._vars = {}
+
+        for v in particleset.ptype.variables:
+            if not v.to_write:
+                continue
+
+            # explicit list of variables to write, so filter based on that
+            if variables is not None and v.name not in variables:
+                continue
+
+            self._vars[v.name] = np.empty((self.n, 0), dtype=v.dtype)
+
+    def set_skip(self, n):
+        """Skip a number of subsequent output steps.
+
+        This is particularly useful to ignore the first advection output,
+        which is the values of particles before the kernel is called, and
+        often contains junk unless an explicit zero-time sampling kernel
+        is used.
+
+        Args:
+            n (int): The number of output steps to skip.
+
+        """
+
+        self.skip = n
+
+    def reverse_data(self):
+        """Reverse all cached advection data.
+
+        This can be used before and after a backward advection to
+        make sure the data is correctly ordered.
+
+        """
+
+        for v, d in self._vars.items():
+            self._vars[v] = d[:, ::-1]
+
+    def write(self, particleset, time, deleted_only=False):
+        """Write data from a particle set.
+
+        This is intended to be called from a particle execution
+        kernel. The frequency of writes is determined by the
+        ``outputdt`` attribute on the class.
+
+        Particles which have been deleted (due to becoming out of
+        bounds, for example) are masked with NaN.
+
+        Args:
+            particleset (parcels.particleset.ParticleSet): Particle set with data
+                to write to disk.
+            time (float): Timestamp into particle execution at which this
+                write was called.
+            deleted_only (Optional[bool]): Whether to only write deleted
+                particles (does not do anything, only present for compatibility
+                with the call signature on the parcels version of the class).
+
+        """
+
+        # don't write out deleted particles
+        if deleted_only is not False:
+            return
+
+        if self.skip > 0:
+            self.skip -= 1
+            return
+
+        # indices of particles still alive
+        idx = particleset.particle_data["id"]
+
+        for v, d in self._vars.items():
+            # next slice of data
+            next_d = np.empty((self.n, 1), dtype=d.dtype)
+            next_d[:] = np.nan
+            next_d[idx, 0] = particleset.particle_data[v]
+
+            self._vars[v] = np.hstack((d, next_d))
