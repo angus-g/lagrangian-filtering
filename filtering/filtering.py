@@ -20,6 +20,7 @@ from scipy import signal
 import xarray as xr
 
 from filtering.file import LagrangeParticleFile
+from filtering.filter import Filter
 
 
 class LagrangeFilter(object):
@@ -185,7 +186,7 @@ class LagrangeFilter(object):
 
         # guess the output timestep from the seed grid
         self.output_dt = self._output_grid.time[1] - self._output_grid.time[0]
-        self.filter_frequency = highpass_frequency
+        self.filter_frequency = highpass_frequency / (2 * np.pi)
         self.inertial_filter = None
 
         # timestep for advection
@@ -237,15 +238,6 @@ class LagrangeFilter(object):
         self._grid_mask = np.ones_like(self._grid_lon, dtype=np.bool)
         # save grid timesteps
         self._output_grid = grid
-
-    def _create_filter(self):
-        """Create the inertial filter for output."""
-
-        # create the filter - use a 4th order Butterworth for the moment
-        # make sure to convert angular frequency back to linear for passing to the
-        # filter constructor
-        fs = 1.0 / self.output_dt
-        return signal.butter(4, self.filter_frequency / (2 * np.pi), "highpass", fs=fs)
 
     def _create_sample_kernel(self, sample_variables):
         """Create the parcels kernel for sampling fields during advection."""
@@ -667,7 +659,7 @@ class LagrangeFilter(object):
         # we need a filter for this step, so create the default filter
         # if necessary
         if self.inertial_filter is None:
-            self.inertial_filter = self._create_filter()
+            self.inertial_filter = Filter(self.filter_frequency, 1.0 / self.output_dt)
 
         da_out = {}
         for v, a in advection_data.items():
@@ -677,47 +669,9 @@ class LagrangeFilter(object):
                 continue
 
             time_index_data, var_array = a
-
-            def filter_select(x):
-                ti = time_index_data
-
-                if self._min_window is not None:
-                    xn = np.isnan(x)
-                    # particles which fit minimum window requirement
-                    # that is, the number of non-NaN values is greater
-                    # than the minimum window size
-                    is_valid = (
-                        np.count_nonzero(~xn, axis=-1)[:, None] >= self._min_window
-                    )
-                    # pad value indices -- the index, per-particle, of the last
-                    # non-NaN value in each direction (forward and backward)
-                    pl = np.argmax(~xn, axis=-1)
-                    pr = x.shape[1] - np.argmax(np.flip(~xn, axis=-1), axis=-1) - 1
-                    # pad values -- get the value associated with the above index
-                    vl = x[np.arange(x.shape[0]), pl]
-                    vr = x[np.arange(x.shape[0]), pr]
-                    # do padding -- for valid particles according to the minimum
-                    # window size, set the backward NaN values to vl, and the
-                    # forward NaN values to vr
-                    x[:, :ti] = np.where(xn[:, :ti] & is_valid, vl[:, None], x[:, :ti])
-                    x[:, ti + 1 :] = np.where(
-                        xn[:, ti + 1 :] & is_valid, vr[:, None], x[:, ti + 1 :]
-                    )
-
-                return signal.filtfilt(*self.inertial_filter, x)[..., ti]
-
-            # apply scipy filter as a ufunc
-            # mapping an array to scalar over the first axis, automatically vectorize execution
-            # and allow rechunking (since we have a chunk boundary across the first axis)
-            filtered = da.apply_gufunc(
-                filter_select,
-                "(i)->()",
-                var_array.rechunk((-1, "auto")),
-                axis=0,
-                output_dtypes=var_array.dtype,
+            da_out[v] = self.inertial_filter.apply_filter(
+                var_array, time_index_data, min_window=self._min_window
             )
-
-            da_out[v] = filtered.compute()
 
         return da_out
 

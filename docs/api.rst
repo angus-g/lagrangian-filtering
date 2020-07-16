@@ -8,6 +8,12 @@ filtering
 .. automodule:: filtering.filtering
    :members:
 
+filter
+======
+
+.. automodule:: filtering.filter
+   :members:
+
 file
 ====
 

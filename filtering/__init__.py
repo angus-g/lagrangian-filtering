@@ -6,3 +6,4 @@ except DistributionNotFound:
     pass
 
 from filtering.filtering import LagrangeFilter
+import filtering.filter
