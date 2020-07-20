@@ -526,6 +526,39 @@ class LagrangeFilter(object):
             time=time,
         )
 
+    def _advect(self, ps, outfile):
+        # execute the sample-only kernel to efficiently grab the initial condition
+        ps.kernel = self.sample_kernel
+        ps.execute(self.sample_kernel, runtime=0, dt=self.advection_dt)
+
+        # yield to allow the outfile before forward advection
+        yield
+
+        # now the forward advection kernel can run
+        ps.kernel = self.kernel
+        ps.execute(
+            self.kernel,
+            runtime=self.window_size,
+            dt=self.advection_dt,
+            output_file=outfile,
+            recovery={
+                parcels.ErrorCode.ErrorOutOfBounds: _recovery_kernel_out_of_bounds
+            },
+        )
+
+        # we'll need the particles to be re-seeded before backward advection
+        ps = yield
+        ps.kernel = self.kernel
+        ps.execute(
+            self.kernel,
+            runtime=self.window_size,
+            dt=-self.advection_dt,
+            output_file=outfile,
+            recovery={
+                parcels.ErrorCode.ErrorOutOfBounds: _recovery_kernel_out_of_bounds
+            },
+        )
+
     def advection_step(self, time, output_time=False):
         """Perform forward-backward advection at a single point in time.
 
@@ -560,41 +593,26 @@ class LagrangeFilter(object):
 
         # seed all particles at gridpoints
         ps = self.particleset(time)
-        # execute the sample-only kernel to efficiently grab the initial condition
-        ps.kernel = self.sample_kernel
-        ps.execute(self.sample_kernel, runtime=0, dt=self.advection_dt)
-
         # set up the temporary output file for the initial condition and
         # forward advection
         outfile = LagrangeParticleFile(ps, self.output_dt, self.sample_variables)
 
-        # now the forward advection kernel can run
+        # create the advection coroutine
+        adv = self._advect(ps, outfile)
+        # first sampling step
+        next(adv)
+        # pre-forward advection
         outfile.set_group("forward")
-        ps.kernel = self.kernel
-        ps.execute(
-            self.kernel,
-            runtime=self.window_size,
-            dt=self.advection_dt,
-            output_file=outfile,
-            recovery={
-                parcels.ErrorCode.ErrorOutOfBounds: _recovery_kernel_out_of_bounds
-            },
-        )
-
-        # reseed particles back on the grid, then advect backwards
-        # we don't need any initial condition sampling since we've already done it
+        next(adv)
+        # pre-backward advection, needs a reseed
         outfile.set_group("backward")
-        ps = self.particleset(time)
-        ps.kernel = self.kernel
-        ps.execute(
-            self.kernel,
-            runtime=self.window_size,
-            dt=-self.advection_dt,
-            output_file=outfile,
-            recovery={
-                parcels.ErrorCode.ErrorOutOfBounds: _recovery_kernel_out_of_bounds
-            },
-        )
+
+        # because this is the end of the coroutine,
+        # we need to handle the StopIteration exception
+        try:
+            adv.send(self.particleset(time))
+        except StopIteration:
+            pass
 
         # stitch together and filter all sample variables from the temporary
         # output data
