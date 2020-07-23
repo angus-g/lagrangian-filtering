@@ -71,6 +71,55 @@ class DistributedFilter(object):
             np.dstack(np.meshgrid(lon, lat)), chunks + (None,), name="seeds"
         )
 
+    @staticmethod
+    def _update_chunks(fieldset, signdt):
+        """Shuffle loaded data chunks around in a fieldset with deferred-loaded
+        xarray data.
+
+        """
+
+        for f in fieldset.get_fields():
+            # we're only interested in bare fields, not derived fields
+            if isinstance(f, parcels.VectorField):
+                continue
+
+            g = f.grid
+
+            # we're only interested in grids that have moved to a new
+            # time index, and thus need the loaded chunks to be shuffled
+            if g.update_status != "updated":
+                continue
+
+            # drop data for loaded chunks that weren't accessed last time
+            g.load_chunk = np.where(g.load_chunk == 3, 0, g.load_chunk)
+
+            for block_id in range(len(g.load_chunk)):
+                if g.load_chunk[block_id] == 2:
+                    # chunk was loaded and touched in the last
+                    # kernel invocation -- eagerly load in the next step
+                    if f.data_chunks[block_id] is None:
+                        # the chunk on this field wasn't loaded
+                        # (it shares a grid with a field that was used)
+                        break
+
+                    block = f.get_block(block_id)
+                    if signdt >= 0:
+                        # drop first index, append to the end
+                        f.data_chunks[block_id] = np.concatenate(
+                            (
+                                f.data_chunks[block_id][1:],
+                                np.array(f.data.blocks[(g.ti + g.tdim - 1,) + block]),
+                            )
+                        )
+                    else:
+                        # drop last index, append at the front
+                        f.data_chunks[block_id] = np.concatenate(
+                            (
+                                np.array(f.data.blocks[(g.ti,) + block]),
+                                f.data_chunks[block_id][:-1],
+                            )
+                        )
+
     def create_filter(self, data):
         """Create an instance of :class:`~filtering.filtering.LagrangeFilter`
 
@@ -97,6 +146,8 @@ class DistributedFilter(object):
             deferred_load=True,
             **self.filter_kwargs,
         )
+
+        f.fieldset.compute_on_defer = self._update_chunks
 
         return f
 
@@ -154,6 +205,7 @@ class DistributedFilter(object):
         # reset loaded chunks and set up particleset for backward advection
         for g in f.fieldset.gridset.grids:
             g.load_chunk[:] = 0
+
         outarray.reverse_data()
         outarray.set_skip(1)
         adv.send(self.particleset(f, time, block))
