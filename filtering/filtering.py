@@ -99,6 +99,8 @@ class LagrangeFilter(object):
         advection_dt (Optional[datetime.timedelta]): The timestep
             to use for advection. May need to be adjusted depending on the
             resolution/frequency of your data.
+        **kwargs (Optional): Additional arguments are passed to the Parcels
+            FieldSet constructor.
 
     """
 
@@ -109,14 +111,13 @@ class LagrangeFilter(object):
         variables,
         dimensions,
         sample_variables,
-        mesh="flat",
         c_grid=False,
-        indices={},
         uneven_window=False,
         window_size=None,
         minimum_window=None,
         highpass_frequency=5e-5,
         advection_dt=timedelta(minutes=5),
+        **kwargs,
     ):
         # The name of this filter
         self.name = name
@@ -135,7 +136,6 @@ class LagrangeFilter(object):
         self._filenames = filenames_or_dataset
         self._variables = variables
         self._dimensions = dimensions
-        self._indices = indices
         # sample variables without the "var_" prefix
         self._sample_variables = sample_variables
 
@@ -147,7 +147,8 @@ class LagrangeFilter(object):
             fieldset_constructor = parcels.FieldSet.from_netcdf
 
         # for C-grid data, we have to change the interpolation method
-        fieldset_kwargs = {}
+        fieldset_kwargs = kwargs
+        fieldset_kwargs.setdefault("mesh", "flat")
         if c_grid:
             interp_method = {}
             for v in variables:
@@ -160,12 +161,7 @@ class LagrangeFilter(object):
 
         # construct the OceanParcels FieldSet to use for particle advection
         self.fieldset = fieldset_constructor(
-            filenames_or_dataset,
-            variables,
-            dimensions,
-            indices=indices,
-            mesh=mesh,
-            **fieldset_kwargs,
+            filenames_or_dataset, variables, dimensions, **fieldset_kwargs,
         )
 
         self._output_field = self.fieldset.get_fields()[0].name
