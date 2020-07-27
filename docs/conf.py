@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.abspath(".."))
 # -- Project information -----------------------------------------------------
 
 project = "lagrangian-filtering"
-copyright = "2019, Angus Gibson"
+copyright = "2019-2020, Angus Gibson"
 author = "Angus Gibson"
 
 # The short X.Y version
