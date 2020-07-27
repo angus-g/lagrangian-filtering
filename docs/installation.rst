@@ -16,9 +16,11 @@ If you use Conda_ to manage Python packages, you may run
 
    $ conda install -c conda-forge -c angus-g lagrangian-filtering
 
-to install this package and all its required dependencies. The ``-c
-angus-g`` flag must come before the ``-c conda-forge`` flag to ensure
-the correct OceanParcels dependency is pulled in.
+to install this package and all its required dependencies. If the
+``-c angus-g`` flag is placed before the ``-c conda-forge`` flag, a
+modified OceanParcels dependency is pulled in. By default, this
+shouldn't be required, but some experimental features may only be
+present in this version.
 
 To keep things a bit cleaner, you can install `lagrangian-filtering`
 in its own Conda environment:
