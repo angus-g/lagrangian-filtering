@@ -51,15 +51,17 @@ class LagrangeParticleFile(object):
         variables (Optional[List[parcels.particle.Variable]]): An explicit list subset of
             particletype variables to output. If not specified, all variables
             belonging to the particletype that are ``to_write`` are written.
+        output_dir (Optional[str]): The directory in which to place the temporary
+            output file.
 
     """
 
-    def __init__(self, particleset, outputdt=np.infty, variables=None):
+    def __init__(self, particleset, outputdt=np.infty, variables=None, output_dir="."):
         self.outputdt = outputdt
 
         self.n = len(particleset)
 
-        self._tempfile = tempfile.NamedTemporaryFile(dir=".", suffix=".h5")
+        self._tempfile = tempfile.NamedTemporaryFile(dir=output_dir, suffix=".h5")
         self.h5file = h5py.File(self._tempfile, "w")
 
         # using upstream parcels, it'll try to read this attribute
