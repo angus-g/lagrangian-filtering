@@ -188,6 +188,10 @@ class LagrangeFilter(object):
         # timestep for advection
         self.advection_dt = advection_dt
 
+        # default class for caching advection data before filtering
+        self._advection_cache_class = LagrangeParticleFile
+        self._advection_cache_kwargs = {}
+
         # the sample variable attribute has 'var_' prepended to map to
         # variables on particles
         self.sample_variables = ["var_" + v for v in sample_variables]
@@ -562,7 +566,9 @@ class LagrangeFilter(object):
 
         # set up the temporary output file for the initial condition and
         # forward advection
-        outfile = LagrangeParticleFile(ps, self.output_dt, self.sample_variables)
+        outfile = self._advection_cache_class(
+            ps, self.output_dt, self.sample_variables, **self._advection_cache_kwargs
+        )
 
         # now the forward advection kernel can run
         outfile.set_group("forward")
