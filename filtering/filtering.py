@@ -150,8 +150,11 @@ class LagrangeFilter(object):
         fieldset_kwargs = kwargs
         fieldset_kwargs.setdefault("mesh", "flat")
         if c_grid:
-            interp_method = {}
+            interp_method = kwargs.get("interp_method", {})
             for v in variables:
+                if v in interp_method:
+                    continue
+
                 if v in ["U", "V", "W"]:
                     interp_method[v] = "cgrid_velocity"
                 else:
@@ -161,7 +164,10 @@ class LagrangeFilter(object):
 
         # construct the OceanParcels FieldSet to use for particle advection
         self.fieldset = fieldset_constructor(
-            filenames_or_dataset, variables, dimensions, **fieldset_kwargs,
+            filenames_or_dataset,
+            variables,
+            dimensions,
+            **fieldset_kwargs,
         )
 
         self._output_field = self.fieldset.get_fields()[0].name

@@ -69,6 +69,36 @@ def parcels_args(dimensions_grid):
     return arg_tuple + (c_grid,)
 
 
+def test_interp_method(parcels_args, nocompile_LagrangeFilter):
+    """Test that we can set interpolation methods on non-velocity data."""
+
+    dataset, variables, dimensions, c_grid = parcels_args
+
+    interp_method = {"T": "linear_invdist_land_tracer"}
+    if not c_grid:
+        interp_method["U"] = "linear"
+        interp_method["V"] = "linear"
+
+    f = nocompile_LagrangeFilter(
+        "test",
+        dataset,
+        variables,
+        dimensions,
+        sample_variables=["T"],
+        c_grid=c_grid,
+        interp_method=interp_method,
+    )
+
+    # make sure we set the correct interpolation method on the tracer
+    assert f.fieldset.T.interp_method == "linear_invdist_land_tracer"
+
+    # but the velocity should have been automatic
+    if c_grid:
+        assert f.fieldset.U.interp_method == "cgrid_velocity"
+    else:
+        assert f.fieldset.U.interp_method == "linear"
+
+
 def test_particleset_default_particle_locations(parcels_args, nocompile_LagrangeFilter):
     """Test that particles end up at the U-grid gridpoints by default"""
 
