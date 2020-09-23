@@ -78,7 +78,9 @@ class Filter(object):
             xn[:, :time_index] & is_valid, vl[:, None], x[:, :time_index]
         )
         x[:, time_index + 1 :] = np.where(
-            xn[:, time_index + 1 :] & is_valid, vr[:, None], x[:, time_index + 1 :],
+            xn[:, time_index + 1 :] & is_valid,
+            vr[:, None],
+            x[:, time_index + 1 :],
         )
 
     def apply_filter(self, data, time_index, min_window=None):
