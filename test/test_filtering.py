@@ -73,8 +73,8 @@ def test_sanity():
     assert u[nt // 2] == pytest.approx(U0)
 
     # construct filter
-    f = signal.butter(4, w / 2, "highpass")
-    fu = signal.filtfilt(*f, u)
+    f = signal.butter(4, w / 2, "highpass", output="sos")
+    fu = signal.sosfiltfilt(f, u)
     assert fu[nt // 2] == pytest.approx(0.0, abs=1e-2)
 
 

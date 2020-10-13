@@ -40,7 +40,7 @@ class Filter(object):
 
         """
 
-        return signal.butter(4, frequency, "highpass", fs=fs)
+        return signal.butter(4, frequency, "highpass", fs=fs, output="sos")
 
     @staticmethod
     def pad_window(x, centre_index, min_window):
@@ -104,7 +104,7 @@ class Filter(object):
             if min_window is not None:
                 Filter.pad_window(x, time_index, min_window)
 
-            return signal.filtfilt(*self._filter, x)[..., time_index]
+            return signal.sosfiltfilt(self._filter, x)[..., time_index]
 
         # apply scipy filter as a ufunc
         # mapping an array to scalar over the first axis, automatically vectorize execution
