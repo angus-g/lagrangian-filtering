@@ -116,7 +116,7 @@ class LagrangeParticleFile(object):
             group (str): The name of the group to retrieve.
 
         Returns:
-            :class:`h5py.Group <Group>`: The group from the underlying HDF5 file.
+            :class:`h5py.Group`: The group from the underlying HDF5 file.
                 If the group hasn't been initialised with
                 :func:`~filtering.file.LagrangeParticleFile.set_group`,
                 it will be empty.

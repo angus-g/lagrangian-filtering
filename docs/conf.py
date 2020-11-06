@@ -195,7 +195,7 @@ intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "cftime": ("https://unidata.github.io/cftime/", None),
     "dask": ("https://docs.dask.org/en/stable/", None),
-    "h5py": ("http://docs.h5py.org/en/stable/", None),
+    "h5py": ("https://docs.h5py.org/en/stable/", None),
     "numpy": ("https://numpy.org/doc/1.18/", None),
     "parcels": ("http://oceanparcels.org/gh-pages/html/", None),
     "xarray": ("http://xarray.pydata.org/en/stable/", None),
