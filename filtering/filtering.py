@@ -875,6 +875,14 @@ class LagrangeFilter(object):
         # either restrict the specified times to period covered by window,
         # or use the full range of times covered by window
         times = self._window_times(times, absolute)
+        if len(times) == 0:
+            logging.warning(
+                "No times are suitable for filtering. There may not be a window-width "
+                "of data on either side of any of the specified times."
+            )
+
+            # early return to not create an output file
+            return
 
         ds, time_dim = self.create_out(clobber=clobber)
 
