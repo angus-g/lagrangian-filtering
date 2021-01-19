@@ -10,6 +10,7 @@ library.
 from datetime import timedelta
 from glob import iglob
 import logging
+import os.path
 
 import cftime
 import dask.array as da
@@ -270,7 +271,12 @@ class LagrangeFilter(object):
     def _compile(self, kernel):
         """Compile a kernel and tell it to load the resulting shared library."""
 
-        kernel.compile(compiler=parcels.compiler.GNUCompiler())
+        parcels_dir = os.path.join(
+            parcels.tools.global_statics.get_package_dir(), "include"
+        )
+        kernel.compile(
+            compiler=parcels.compilation.codecompiler.GNUCompiler(incdirs=[parcels_dir])
+        )
         kernel.load_lib()
 
     def set_output_compression(self, complevel=None):

@@ -13,7 +13,14 @@ import numpy as np
 from parcels import ErrorCode
 
 
-class LagrangeParticleFile(object):
+class BaseParticleCache(object):
+    def __init__(self, particleset, outputdt):
+        self.outputdt = outputdt
+        self.n = len(particleset)
+        self._variables = particleset._collection.ptype.variables
+
+
+class LagrangeParticleFile(BaseParticleCache):
     """A ParticleFile for on-disk caching in a temporary HDF5 file.
 
     A temporary HDF5 file is used to store advection data. Data is
@@ -57,9 +64,7 @@ class LagrangeParticleFile(object):
     """
 
     def __init__(self, particleset, outputdt=np.infty, variables=None, output_dir="."):
-        self.outputdt = outputdt
-
-        self.n = len(particleset)
+        super().__init__(particleset, outputdt)
 
         self._tempfile = tempfile.NamedTemporaryFile(dir=output_dir, suffix=".h5")
         self.h5file = h5py.File(self._tempfile, "w")
@@ -71,7 +76,7 @@ class LagrangeParticleFile(object):
         # variable -> dtype map for creating datasets
         self._vars = {}
 
-        for v in particleset.ptype.variables:
+        for v in self._variables:
             # this variable isn't marked for output to file -- honour that
             if not v.to_write:
                 continue
@@ -153,7 +158,7 @@ class LagrangeParticleFile(object):
         self._group.attrs["time"] = np.append(self._group.attrs["time"], time)
 
         # indices of particles still alive
-        idx = particleset.particle_data["id"]
+        idx = particleset.id
 
         for v, d in self._var_datasets.items():
             # first, resize all datasets to add another entry in the time dimension
@@ -161,10 +166,10 @@ class LagrangeParticleFile(object):
             d.resize(d.shape[0] + 1, axis=0)
             # data defaults to nans, and we only fill in the living particles
             d[-1, :] = np.nan
-            d[-1, idx] = particleset.particle_data[v]
+            d[-1, idx] = getattr(particleset, v)
 
 
-class LagrangeParticleArray(object):
+class LagrangeParticleArray(BaseParticleCache):
     """A ParticleFile for in-memory caching of advected data.
 
     For smaller spatial extents, or sufficient memory, it is easier to
@@ -194,8 +199,8 @@ class LagrangeParticleArray(object):
     """
 
     def __init__(self, particleset, outputdt=np.infty, variables=None):
-        self.outputdt = outputdt
-        self.n = len(particleset)
+        super().__init__(particleset, outputdt)
+
         self.skip = 0
 
         # parcels will read this attribute for printing a message
@@ -204,7 +209,7 @@ class LagrangeParticleArray(object):
         # dictionary containing cached arrays for each variable
         self._vars = {}
 
-        for v in particleset.ptype.variables:
+        for v in self._variables:
             if not v.to_write:
                 continue
 
@@ -270,12 +275,12 @@ class LagrangeParticleArray(object):
             return
 
         # indices of particles still alive
-        idx = particleset.particle_data["id"]
+        idx = particleset.id
 
         for v, d in self._vars.items():
             # next slice of data
             next_d = np.empty((self.n, 1), dtype=d.dtype)
             next_d[:] = np.nan
-            next_d[idx, 0] = particleset.particle_data[v]
+            next_d[idx, 0] = getattr(particleset, v)
 
             self._vars[v] = np.hstack((d, next_d))
