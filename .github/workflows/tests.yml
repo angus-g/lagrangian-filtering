@@ -3,7 +3,16 @@ name: Testing
 on: push
 
 jobs:
-  setup:
+  formatting:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Code formatting
+        uses: lgeiger/black-action@v1.0.1
+
+  testing:
+    needs: formatting
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -19,9 +28,7 @@ jobs:
         run: |
           python -m pip install -e '.[build]'
           python -m pip install -r requirements.txt
-          python -m pip install sphinx
-      - name: Code formatting
-        uses: lgeiger/black-action@v1.0.1
+          python -m pip install sphinx pytest
       - name: Unit tests
         run: |
           python -m pytest
