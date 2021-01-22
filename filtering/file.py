@@ -161,12 +161,15 @@ class LagrangeParticleFile(BaseParticleCache):
         idx = particleset.id
 
         for v, d in self._var_datasets.items():
-            # first, resize all datasets to add another entry in the time dimension
+            # data defaults to nans, and we only fill in the living particles
+            tmp = np.empty(d.shape[1])
+            tmp[:] = np.nan
+            tmp[idx] = getattr(particleset, v)
+
+            # resize all datasets to add another entry in the time dimension
             # then we can just pull the array for this variable out of the particleset
             d.resize(d.shape[0] + 1, axis=0)
-            # data defaults to nans, and we only fill in the living particles
-            d[-1, :] = np.nan
-            d[-1, idx] = getattr(particleset, v)
+            d[-1, :] = tmp
 
 
 class LagrangeParticleArray(BaseParticleCache):
