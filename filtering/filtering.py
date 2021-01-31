@@ -537,13 +537,16 @@ class LagrangeFilter(object):
         # reset the global particle ID counter so we can rely on particle IDs making sense
         self.particleclass.setLastID(0)
 
-        return parcels.ParticleSet(
+        ps = parcels.ParticleSet(
             self.fieldset,
             pclass=self.particleclass,
             lon=self._grid_lon,
             lat=self._grid_lat,
             time=time,
         )
+        ps.populate_indices()
+
+        return ps
 
     def advection_step(self, time, output_time=False):
         """Perform forward-backward advection at a single point in time.
