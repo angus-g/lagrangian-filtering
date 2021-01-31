@@ -165,10 +165,7 @@ class LagrangeFilter(object):
 
         # construct the OceanParcels FieldSet to use for particle advection
         self.fieldset = fieldset_constructor(
-            filenames_or_dataset,
-            variables,
-            dimensions,
-            **fieldset_kwargs,
+            filenames_or_dataset, variables, dimensions, **fieldset_kwargs
         )
 
         self._output_field = self.fieldset.get_fields()[0].name
@@ -467,7 +464,9 @@ class LagrangeFilter(object):
 
         self._is_meridionally_periodic = True
 
-    def seed_subdomain(self, min_lon=None, max_lon=None, min_lat=None, max_lat=None):
+    def seed_subdomain(
+        self, min_lon=None, max_lon=None, min_lat=None, max_lat=None, skip=None
+    ):
         """Restrict particle seeding to a subdomain.
 
         This uses the full set of available data for advection, but
@@ -490,6 +489,8 @@ class LagrangeFilter(object):
             max_lat (Optional[float]): The upper bound on
                 latitude for which to seed particles. If not specifed,
                 seed from the northern edge of the domain.
+            skip (Optional[int]): The number of gridpoints to skip
+                from the edge of the domain.
 
         """
 
@@ -509,6 +510,12 @@ class LagrangeFilter(object):
             mask &= lat >= min_lat
         if max_lat is not None:
             mask &= lat <= max_lat
+
+        if skip is not None:
+            mask[:skip, :] = 0  # west
+            mask[-skip:, :] = 0  # east
+            mask[:, :skip] = 0  # south
+            mask[:, -skip:] = 0  # north
 
         self._grid_mask = mask
         self._grid_lon = lon[mask]
