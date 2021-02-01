@@ -12,7 +12,6 @@ from glob import iglob
 import logging
 import os.path
 
-import cftime
 import dask.array as da
 import netCDF4
 import numpy as np
@@ -870,7 +869,7 @@ class LagrangeFilter(object):
         time back to an absolute time. However, if the original time
         units require a calendar, we can't just output this directly
         to the netCDF file, so we need to strip the calendar with
-        date2num.
+        date2num through xarray's fairly advanced interface.
 
         """
 
@@ -879,8 +878,9 @@ class LagrangeFilter(object):
         if "units" not in ds[dim].ncattrs() or "calendar" not in ds[dim].ncattrs():
             return t
 
-        # use cftime to convert seconds back to the date-relevant number
-        return cftime.date2num(t, ds[dim].units, calendar=ds[dim].calendar)
+        return xr.coding.times.encode_cf_datetime(
+            t, ds[dim].units, calendar=ds[dim].calendar
+        )[0].item()
 
     def __call__(self, times=None, absolute=False, clobber=False):
         """Run the filtering process on this experiment."""

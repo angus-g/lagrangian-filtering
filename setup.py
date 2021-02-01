@@ -15,7 +15,6 @@ setup(
         "scipy>=1.2.0",
         "xarray",
         "netCDF4",
-        "cftime",
         "parcels @ git+https://github.com/OceanParcels/parcels",
     ],
 )
