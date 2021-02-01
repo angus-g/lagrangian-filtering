@@ -14,7 +14,7 @@ requirements:
     - setuptools_scm
     - python {{ python }}
   run:
-    - python >=3.6
+    - python
     - dask
     - h5py
     - numpy >=1.17.0
