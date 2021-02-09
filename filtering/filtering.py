@@ -800,7 +800,12 @@ class LagrangeFilter(object):
                     ds.createDimension(d, None if dim == "time" else ds_orig[d].size)
 
             # create the dimension variable
-            ds.createVariable(file_dim, ds_orig.dtype, dimensions=ds_orig.dims)
+            ds.createVariable(
+                file_dim,
+                ds_orig.dtype,
+                dimensions=ds_orig.dims,
+                **self._output_variable_kwargs,
+            )
             # copy data if a spatial variable
             if dim != "time":
                 ds.variables[file_dim][:] = ds_orig
