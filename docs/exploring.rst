@@ -23,3 +23,19 @@ compute a spectrum for determining an ideal cutoff frequency:
    f = LagrangeFilter(...)
    data = f.advection_step(time)
    mean_u = np.mean(data["var_U"][1], axis=1)
+
+
+Using analysis functions
+========================
+
+As an alternative to using ad-hoc explorations as above, there are
+predefined functions available to give more robust and efficient ways
+to interrogate your data. For example, a mean kinetic energy spectrum
+over all particles could be computed at a specified time:
+
+.. code-block:: python
+
+   from filtering import analysis
+   f = LagrangeFilter(..., sample_variables["U", "V"], ...)
+   spectra = analysis.power_spectrum(f, time)
+   ke_spectrum = spectra["var_U"] + spectra["var_V"]
