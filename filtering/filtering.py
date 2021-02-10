@@ -528,8 +528,9 @@ class LagrangeFilter(object):
                 on this ParticleSet.
 
         Returns:
-            parcels.particleset.ParticleSet: A new ParticleSet containing a single particle
-                at every gridpoint, initialised at the specified time.
+            parcels.particlesets.particlesetsoa.ParticleSetSOA: A new ParticleSet
+                containing a single particle at every gridpoint,
+                initialised at the specified time.
 
         """
 

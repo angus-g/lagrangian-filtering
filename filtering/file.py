@@ -49,9 +49,10 @@ class LagrangeParticleFile(BaseParticleCache):
         that causes an exception.
 
     Args:
-        particleset (parcels.particleset.ParticleSet): The particle set for which this file
-            should cache advection data on disk. It's assumed the number of particles
-            contained within the set does not change after initialisation.
+        particleset (parcels.particlesets.particlesetsoa.ParticleSetSOA): The particle set
+            for which this file should cache advection data on
+            disk. It's assumed the number of particles contained
+            within the set does not change after initialisation.
         outputdt (Optional[float]): The frequency at which advection data
             should be saved. If not specified, or infinite, the data will be saved
             at the first timestep only.
@@ -141,8 +142,8 @@ class LagrangeParticleFile(BaseParticleCache):
         bounds, for example) are masked with NaN.
 
         Args:
-            particleset (parcels.particleset.ParticleSet): Particle set with data
-                to write to disk.
+            particleset (parcels.particlesets.particlesetsoa.ParticleSetSOA): Particle
+                set with data to write to disk.
             time (float): Timestamp into particle execution at which this
                 write was called.
             deleted_only (Optional[bool]): Whether to only write deleted
@@ -188,7 +189,7 @@ class LagrangeParticleArray(BaseParticleCache):
         :func:`~filtering.file.LagrangeParticleArray.set_skip`.
 
     Args:
-        particleset (parcels.particleset.ParticleSet): The particle set
+        particleset (parcels.particlesets.particlesetsoa.ParticleSetSOA): The particle set
             for which advection data will be cached. We use this to get
             the names and types of sampled variables.
         outputdt (Optional[float]): The frequency at which advection data
@@ -259,8 +260,8 @@ class LagrangeParticleArray(BaseParticleCache):
         bounds, for example) are masked with NaN.
 
         Args:
-            particleset (parcels.particleset.ParticleSet): Particle set with data
-                to write to disk.
+            particleset (parcels.particlesets.particlesetsoa.ParticleSetSOA): Particle
+                set with data to write to disk.
             time (float): Timestamp into particle execution at which this
                 write was called.
             deleted_only (Optional[bool]): Whether to only write deleted
