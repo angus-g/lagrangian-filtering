@@ -6,6 +6,7 @@ diagnostic output.
 """
 
 import dask.array as da
+import numpy as np
 
 
 def power_spectrum(filter, time):
@@ -13,7 +14,9 @@ def power_spectrum(filter, time):
 
     This routine gives the power spectrum (power spectral density) for
     each of the sampled variables within ''filter'', as a mean over
-    all particles. It will run a single advection step at the specified time.
+    all particles. It will run a single advection step at the
+    specified time. The resulting dictionary contains a ''freq'' item,
+    with the FFT frequency bins for the output spectra.
 
     Args:
         filter (filtering.LagrangeFilter): The pre-configured filter object
@@ -27,11 +30,14 @@ def power_spectrum(filter, time):
     """
 
     psds = {}
-    advection_data = filter.advection_step(time, output_time=False)
+    advection_data = filter.advection_step(time, output_time=True)
+    time_series = advection_data.pop("time")
 
     for v, a in advection_data.items():
         spectra = da.fft.fft(a[1].rechunk((-1, "auto")), axis=0)
         mean_spectrum = da.nanmean(da.absolute(spectra) ** 2, axis=1)
         psds[v] = mean_spectrum.compute()
+
+    psds["freq"] = np.fft.fftfreq(time_series.size, 1 / filter.output_dt)
 
     return psds
