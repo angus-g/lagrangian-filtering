@@ -31,7 +31,7 @@ def power_spectrum(filter, time):
 
     for v, a in advection_data.items():
         spectra = da.fft.fft(a[1].rechunk((-1, "auto")), axis=0)
-        mean_spectrum = da.mean(da.absolute(spectra) ** 2, axis=1)
+        mean_spectrum = da.nanmean(da.absolute(spectra) ** 2, axis=1)
         psds[v] = mean_spectrum.compute()
 
     return psds
