@@ -19,3 +19,9 @@ file
 
 .. automodule:: filtering.file
    :members:
+
+analysis
+========
+
+.. automodule:: filtering.analysis
+   :members:

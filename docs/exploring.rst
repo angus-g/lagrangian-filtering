@@ -31,7 +31,8 @@ Using analysis functions
 As an alternative to using ad-hoc explorations as above, there are
 predefined functions available to give more robust and efficient ways
 to interrogate your data. For example, a mean kinetic energy spectrum
-over all particles could be computed at a specified time:
+over all particles could be computed at a specified time using
+:meth:`~filtering.analysis.power_spectrum`:
 
 .. code-block:: python
 
