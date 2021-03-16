@@ -20,6 +20,7 @@ requirements:
     - numpy >=1.17.0
     - scipy >=1.2.0
     - parcels >=2.1.5
+    - pykdtree
 
 about:
   home: https://github.com/angus-g/lagrangian-filtering

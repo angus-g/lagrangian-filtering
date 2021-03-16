@@ -16,5 +16,6 @@ setup(
         "xarray",
         "netCDF4",
         "parcels @ git+https://github.com/OceanParcels/parcels",
+        "pykdtree",
     ],
 )
