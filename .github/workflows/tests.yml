@@ -37,6 +37,8 @@ jobs:
       - name: Unit tests
         run: |
           python -m pytest
+        env:
+          OMP_NUM_THREADS: 1
       - name: Documentation
         run: |
           cd docs

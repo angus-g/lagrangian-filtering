@@ -15,7 +15,7 @@ setup(
         "scipy>=1.2.0",
         "xarray",
         "netCDF4",
-        "parcels @ git+https://github.com/OceanParcels/parcels",
+        "parcels @ git+https://github.com/angus-g/parcels.git@openmp-loop#egg=parcels",
         "pykdtree",
     ],
 )
