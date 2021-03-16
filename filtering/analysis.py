@@ -38,6 +38,6 @@ def power_spectrum(filter, time):
         mean_spectrum = da.nanmean(da.absolute(spectra) ** 2, axis=1)
         psds[v] = mean_spectrum.compute()
 
-    psds["freq"] = np.fft.fftfreq(time_series.size, 1 / filter.output_dt)
+    psds["freq"] = 2 * np.pi * np.fft.fftfreq(time_series.size, filter.output_dt)
 
     return psds
