@@ -185,6 +185,7 @@ class LagrangeFilter(object):
 
         # guess the output timestep from the seed grid
         self.output_dt = self._output_grid.time[1] - self._output_grid.time[0]
+        # default filter frequency
         self.filter_frequency = highpass_frequency / (2 * np.pi)
         self.inertial_filter = None
 
@@ -220,6 +221,36 @@ class LagrangeFilter(object):
         self._min_window = None
         if minimum_window is not None:
             self._min_window = minimum_window / self.output_dt
+
+    @property
+    def seed_lat(self):
+        """The 2D grid of seed particle latitudes.
+
+        Note:
+            This is determined by :func:`~set_particle_grid` and
+            :func:`~seed_subdomain`.
+
+        Returns:
+            numpy.ndarray: The seed particle latitudes.
+
+        """
+
+        return self._grid_lat
+
+    @property
+    def seed_lon(self):
+        """The 2D grid of seed particle longitudes.
+
+        Note:
+            This is determined by :func:`~set_particle_grid` and
+            :func:`~seed_subdomain`.
+
+        Returns:
+            numpy.ndarray: The seed particle longitudes.
+
+        """
+
+        return self._grid_lon
 
     def _set_grid(self, grid):
         """Set the seeding grid from a parcels grid"""
