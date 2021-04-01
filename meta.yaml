@@ -21,6 +21,7 @@ requirements:
     - scipy >=1.2.0
     - parcels >=2.1.5
     - pykdtree
+    - sosfilt
 
 about:
   home: https://github.com/angus-g/lagrangian-filtering
