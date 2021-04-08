@@ -238,7 +238,7 @@ class LagrangeFilter(object):
         # save the original grid to allow subdomain seeding
         self._orig_grid = self._grid_lon, self._grid_lat
         # mask off output
-        self._grid_mask = np.ones_like(self._grid_lon, dtype=np.bool)
+        self._grid_mask = np.ones_like(self._grid_lon, dtype=bool)
         # save grid timesteps
         self._output_grid = grid
 
@@ -496,7 +496,7 @@ class LagrangeFilter(object):
         lon, lat = self._orig_grid
 
         # originally, mask selects full domain
-        mask = np.ones_like(lon, dtype=np.bool)
+        mask = np.ones_like(lon, dtype=bool)
 
         # restrict longitude
         if min_lon is not None:
@@ -910,7 +910,7 @@ class LagrangeFilter(object):
 
         # create a masked array for output
         out_masked = np.ma.masked_array(
-            np.empty_like(self._grid_mask, dtype=np.float), ~self._grid_mask
+            np.empty_like(self._grid_mask, dtype=np.float32), ~self._grid_mask
         )
 
         # do the filtering at each timestep
