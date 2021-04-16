@@ -30,3 +30,19 @@ def test_frequency_filter(leewave_data):
     U_filt = f.filter_step(adv)["var_U"].reshape(leewave_data.y.size, -1)
 
     assert np.all((leewave_data.U_orig.data - U_filt[0, :]) ** 2 < 3e-8)
+
+
+def test_spatial_filter():
+    """Test creation and frequency response of a latitude-dependent filter."""
+
+    lons = np.array([0])
+    lats = np.array([1, 2])
+
+    lons, lats = np.meshgrid(lons, lats)
+
+    f = lats * 0.1
+    filt = filtering.filter.SpatialFilter(f, 1)
+
+    for freq, filter_obj in zip(f, filt._filter):
+        w, h = signal.sosfreqz(filter_obj)
+        assert np.all(abs(h)[w < freq] < 0.1)

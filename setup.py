@@ -17,5 +17,6 @@ setup(
         "netCDF4",
         "parcels @ git+https://github.com/angus-g/parcels.git@openmp-loop#egg=parcels",
         "pykdtree",
+        "sosfilt",
     ],
 )
