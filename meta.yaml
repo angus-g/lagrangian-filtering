@@ -12,6 +12,7 @@ build:
 requirements:
   build:
     - setuptools_scm
+    - setuptools_scm_git_archive
     - python {{ python }}
   run:
     - python
