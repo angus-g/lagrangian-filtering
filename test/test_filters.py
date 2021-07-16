@@ -41,7 +41,7 @@ def test_spatial_filter():
     lons, lats = np.meshgrid(lons, lats)
 
     f = lats * 0.1
-    filt = filtering.filter.SpatialFilter(f, 1)
+    filt = filtering.filter.SpatialFilter(f.flatten(), 1)
 
     for freq, filter_obj in zip(f, filt._filter):
         w, h = signal.sosfreqz(filter_obj)
