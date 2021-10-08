@@ -24,6 +24,19 @@ GitHub_.
    contributing
    api
 
+Citing
+------
+
+The description and analysis of the Lagrangian filtering method has
+been published in JAMES, and can be cited as:
+
+    Shakespeare, C. J., Gibson, A. H., Hogg, A. M., Bachman, S. D.,
+    Keating, S. R., & Velzeboer, N. (2021). A new open source
+    implementation of Lagrangian filtering: A method to identify
+    internal waves in high-resolution simulations. *Journal of
+    Advances in Modeling Earth Systems*, 13,
+    e2021MS002616. https://doi.org/10.1029/2021MS002616
+
 
 Indices and tables
 ------------------
