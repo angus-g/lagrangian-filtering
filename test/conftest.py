@@ -81,10 +81,10 @@ def leewave_data():
 
     return xr.Dataset(
         {
-            "U": (["t", "y", "x"], Utot),
-            "V": (["t", "y", "x"], Vtot),
-            "U_orig": (["x"], d.U),
-            "V_orig": (["x"], d.V),
+            "U": (["t", "y", "x"], Utot.data),
+            "V": (["t", "y", "x"], Vtot.data),
+            "U_orig": (["x"], d.U.data),
+            "V_orig": (["x"], d.V.data),
         },
         coords={"x": x, "y": y, "t": t},
     )
