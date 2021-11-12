@@ -635,7 +635,11 @@ class LagrangeFilter(object):
         # set up the temporary output file for the initial condition and
         # forward advection
         outfile = self._advection_cache_class(
-            ps, self.output_dt, self.sample_variables, **self._advection_cache_kwargs
+            ps,
+            self.output_dt,
+            self.sample_variables,
+            self.init_only_variables,
+            **self._advection_cache_kwargs,
         )
 
         # now the forward advection kernel can run
