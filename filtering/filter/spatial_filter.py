@@ -47,7 +47,7 @@ class SpatialFilter(Filter):
 
         return sosfilt.butter(4, frequencies, "highpass", fs=fs, output="sos")
 
-    def apply_filter(self, data, time_index, min_window=None):
+    def apply_filter(self, data, time_index, static_data=None, min_window=None):
         """Apply the filter to an array of data."""
 
         def filter_select(filt, x):

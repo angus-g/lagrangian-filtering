@@ -84,7 +84,7 @@ class Filter(object):
             x[:, time_index + 1 :],
         )
 
-    def apply_filter(self, data, time_index, min_window=None):
+    def apply_filter(self, data, time_index, static_data=None, min_window=None):
         """Apply the filter to an array of data.
 
         Args:
@@ -139,7 +139,7 @@ class FrequencySpaceFilter(Filter):
         self._frequency = frequency
         self._spacing = 1.0 / fs
 
-    def apply_filter(self, data, time_index, min_window=None):
+    def apply_filter(self, data, time_index, static_data=None, min_window=None):
         """Apply the filter to an array of data."""
 
         # we can't apply FFT to time-chunked data

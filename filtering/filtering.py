@@ -694,6 +694,9 @@ class LagrangeFilter(object):
 
             da_out[v] = (time_index_data, var_array)
 
+        for v in self.init_only_variables:
+            da_out[v] = outfile.data("forward")[v]
+
         if output_time:
             da_out["time"] = np.concatenate(
                 (
@@ -735,6 +738,8 @@ class LagrangeFilter(object):
         if self.inertial_filter is None:
             self.inertial_filter = Filter(self.filter_frequency, 1.0 / self.output_dt)
 
+        static_data = {v: advection_data[v] for v in self.init_only_variables}
+
         da_out = {}
         for v, a in advection_data.items():
             # don't try to filter the time axis, just take the middle value
@@ -742,9 +747,13 @@ class LagrangeFilter(object):
                 da_out[v] = a[a.size // 2]
                 continue
 
+            # don't filter our static data
+            if v in self.init_only_variables:
+                continue
+
             time_index_data, var_array = a
             da_out[v] = self.inertial_filter.apply_filter(
-                var_array, time_index_data, min_window=self._min_window
+                var_array, time_index_data, static_data, min_window=self._min_window
             )
 
         return da_out
