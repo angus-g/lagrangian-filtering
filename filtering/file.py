@@ -127,8 +127,8 @@ class LagrangeParticleFile(BaseParticleCache):
         self._var_datasets = {}
         for v, t in self._vars.items():
             if isinstance(t, Placeholder):
-                self._var_datasets[v] = self._group.require_dataset(
-                    v, shape=(self.n,), dtype=t.value
+                self._var_datasets[v] = Placeholder(
+                    self._group.require_dataset(v, shape=(self.n,), dtype=t.value)
                 )
             else:
                 self._var_datasets[v] = self._group.require_dataset(
