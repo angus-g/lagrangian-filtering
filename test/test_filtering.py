@@ -165,6 +165,36 @@ def test_curvilinear_advection():
     assert np.array_equal(t, t_trans)
 
 
+def test_initial_sampling():
+    """Test whether we can pick up a static field with initial condition
+    sampling."""
+
+    nt = 37
+    w = 1 / 6
+    d, t, u = velocity_dataset(nt, w)
+
+    # add a vorticity variable to the dataset. this is the hacky
+    # broadcast way that gets us all the dimensions on the new array
+    d["phi"] = d.time / 3600.0 + d.y + d.x ** 2
+
+    f = filtering.LagrangeFilter(
+        "sampling_test",
+        d,
+        {"U": "u", "V": "v", "PHI": "phi"},
+        {"lon": "x", "lat": "y", "time": "time"},
+        sample_variables=["U"],
+        init_only_variables=["PHI"],
+        mesh="flat",
+        window_size=18 * 3600,
+        advection_dt=60,
+    )
+
+    transformed = f.advection_step(t[nt // 2], output_time=True)
+
+    assert "init_PHI" in transformed
+    assert np.allclose(d["phi"][nt // 2].values.flatten(), transformed["init_PHI"][:])
+
+
 def test_zonally_periodic_advection():
     """Sanity check of advection in a zonally periodic domain.
 

@@ -13,6 +13,13 @@ import numpy as np
 from parcels import ErrorCode
 
 
+class Placeholder(object):
+    """A placeholder type for an advection array that hasn't yet been allocated."""
+
+    def __init__(self, obj):
+        self.value = obj
+
+
 class BaseParticleCache(object):
     def __init__(self, particleset, outputdt):
         self.outputdt = outputdt
@@ -64,7 +71,14 @@ class LagrangeParticleFile(BaseParticleCache):
 
     """
 
-    def __init__(self, particleset, outputdt=np.infty, variables=None, output_dir="."):
+    def __init__(
+        self,
+        particleset,
+        outputdt=np.infty,
+        variables=None,
+        write_once_variables=None,
+        output_dir=".",
+    ):
         super().__init__(particleset, outputdt)
 
         self._tempfile = tempfile.NamedTemporaryFile(dir=output_dir, suffix=".h5")
@@ -77,6 +91,9 @@ class LagrangeParticleFile(BaseParticleCache):
         # variable -> dtype map for creating datasets
         self._vars = {}
 
+        variables = variables or []
+        write_once_variables = write_once_variables or []
+
         for v in self._variables:
             # this variable isn't marked for output to file -- honour that
             if not v.to_write:
@@ -84,10 +101,11 @@ class LagrangeParticleFile(BaseParticleCache):
 
             # there's an explicit list of variables for us to write, so
             # filter based on that (e.g. outputting only sample_variables)
-            if variables is not None and v.name not in variables:
-                continue
+            if v.name in variables:
+                self._vars[v.name] = v.dtype
 
-            self._vars[v.name] = v.dtype
+            elif v.name in write_once_variables:
+                self._vars[v.name] = Placeholder(v.dtype)
 
     def set_group(self, group):
         """Set the group for subsequent write operations.
@@ -108,9 +126,14 @@ class LagrangeParticleFile(BaseParticleCache):
             self._group.attrs["time"] = []
         self._var_datasets = {}
         for v, t in self._vars.items():
-            self._var_datasets[v] = self._group.require_dataset(
-                v, shape=(0, self.n), maxshape=(None, self.n), dtype=t
-            )
+            if isinstance(t, Placeholder):
+                self._var_datasets[v] = Placeholder(
+                    self._group.require_dataset(v, shape=(self.n,), dtype=t.value)
+                )
+            else:
+                self._var_datasets[v] = self._group.require_dataset(
+                    v, shape=(0, self.n), maxshape=(None, self.n), dtype=t
+                )
 
     def data(self, group):
         """Return a group from the HDF5 object.
@@ -162,15 +185,25 @@ class LagrangeParticleFile(BaseParticleCache):
         idx = particleset.id
 
         for v, d in self._var_datasets.items():
-            # data defaults to nans, and we only fill in the living particles
-            tmp = np.empty(d.shape[1])
-            tmp[:] = np.nan
-            tmp[idx] = getattr(particleset, v)
+            if isinstance(d, Placeholder):
+                tmp = np.empty(d.value.shape)
+                tmp[:] = np.nan
+                tmp[idx] = getattr(particleset, v)
 
-            # resize all datasets to add another entry in the time dimension
-            # then we can just pull the array for this variable out of the particleset
-            d.resize(d.shape[0] + 1, axis=0)
-            d[-1, :] = tmp
+                d.value[:] = tmp
+
+                self._var_datasets[v] = d.value
+
+            elif d.ndim == 2:
+                # data defaults to nans, and we only fill in the living particles
+                tmp = np.empty(d.shape[1])
+                tmp[:] = np.nan
+                tmp[idx] = getattr(particleset, v)
+
+                # resize all datasets to add another entry in the time dimension
+                # then we can just pull the array for this variable out of the particleset
+                d.resize(d.shape[0] + 1, axis=0)
+                d[-1, :] = tmp
 
 
 class LagrangeParticleArray(BaseParticleCache):
@@ -195,14 +228,18 @@ class LagrangeParticleArray(BaseParticleCache):
         outputdt (Optional[float]): The frequency at which advection data
             should be saved. If not specified, or infinite, the data will
             be saved at the first timestep only.
-        variables (Optional[List[parcels.particle.Variable]]): An explicit
+        variables (Optional[List[str]]): An explicit
             subset of variables to output. If not specified, all
             variables belonging to the particleset's particletype that
             are ``to_write`` are written.
+        write_once_variables (Optional[List[str]]): An explicit subset of
+            variables to write only on the first write call.
 
     """
 
-    def __init__(self, particleset, outputdt=np.infty, variables=None):
+    def __init__(
+        self, particleset, outputdt=np.infty, variables=None, write_once_variables=None
+    ):
         super().__init__(particleset, outputdt)
 
         self.skip = 0
@@ -213,15 +250,20 @@ class LagrangeParticleArray(BaseParticleCache):
         # dictionary containing cached arrays for each variable
         self._vars = {}
 
+        # default to empty lists
+        variables = variables or []
+        write_once_variables = write_once_variables or []
+
         for v in self._variables:
             if not v.to_write:
                 continue
 
             # explicit list of variables to write, so filter based on that
-            if variables is not None and v.name not in variables:
-                continue
+            if v.name in variables:
+                self._vars[v.name] = np.empty((self.n, 0), dtype=v.dtype)
 
-            self._vars[v.name] = np.empty((self.n, 0), dtype=v.dtype)
+            elif v.name in write_once_variables:
+                self._vars[v.name] = Placeholder(v.dtype)
 
     def set_skip(self, n):
         """Skip a number of subsequent output steps.
@@ -282,9 +324,18 @@ class LagrangeParticleArray(BaseParticleCache):
         idx = particleset.id
 
         for v, d in self._vars.items():
-            # next slice of data
-            next_d = np.empty((self.n, 1), dtype=d.dtype)
-            next_d[:] = np.nan
-            next_d[idx, 0] = getattr(particleset, v)
+            if isinstance(d, Placeholder):
+                # write-once variables
+                arr = np.empty((self.n,), dtype=d.value)
+                arr[:] = np.nan
+                arr[idx] = getattr(particleset, v)
 
-            self._vars[v] = np.hstack((d, next_d))
+                self._vars[v] = arr
+
+            elif d.ndim == 2:
+                # next slice of data
+                next_d = np.empty((self.n, 1), dtype=d.dtype)
+                next_d[:] = np.nan
+                next_d[idx, 0] = getattr(particleset, v)
+
+                self._vars[v] = np.hstack((d, next_d))

@@ -75,6 +75,10 @@ class LagrangeFilter(object):
             names to the dimension names in your data files.
         sample_variables (List[str]): A list of variable names that should be sampled
             into the Lagrangian frame of reference and filtered.
+        init_only_variables (Optional[List[str]]): An optional list of variable
+            names that should be sampled where particles are spawned, but not
+            participate in advection. These variables can be passed through to
+            filters.
         mesh (Optional[str]): The OceanParcels mesh type, either "flat"
             or "spherical". "flat" meshes are expected to have dimensions
             in metres, and "spherical" meshes in degrees.
@@ -111,6 +115,7 @@ class LagrangeFilter(object):
         variables,
         dimensions,
         sample_variables,
+        init_only_variables=[],
         c_grid=False,
         uneven_window=False,
         window_size=None,
@@ -199,19 +204,27 @@ class LagrangeFilter(object):
         # the sample variable attribute has 'var_' prepended to map to
         # variables on particles
         self.sample_variables = ["var_" + v for v in sample_variables]
+        self.init_only_variables = ["init_" + v for v in init_only_variables]
+
         # create the particle class and kernel for sampling
         # map sampled variables to fields
-        self.particleclass = ParticleFactory(sample_variables)
+        self.particleclass = ParticleFactory(
+            self.sample_variables + self.init_only_variables
+        )
         # if we're using cgrid, we need to set the lon/lat dtypes to 64-bit,
         # otherwise things get reordered when we create the particleclass
         if c_grid:
             self.particleclass.set_lonlatdepth_dtype(np.float64)
 
-        self._create_sample_kernel(sample_variables)
+        self.sample_kernel = self._create_sample_kernel(sample_variables)
+        self.init_kernel = self.sample_kernel + self._create_sample_kernel(
+            init_only_variables, "init_kernel", "init"
+        )
         self.kernel = parcels.AdvectionRK4 + self.sample_kernel
 
         # compile kernels
         self._compile(self.sample_kernel)
+        self._compile(self.init_kernel)
         self._compile(self.kernel)
 
         # options (compression, etc.) for creating output variables
@@ -273,21 +286,23 @@ class LagrangeFilter(object):
         # save grid timesteps
         self._output_grid = grid
 
-    def _create_sample_kernel(self, sample_variables):
+    def _create_sample_kernel(
+        self, sample_variables, kernel_name="sample_kernel", prefix="var"
+    ):
         """Create the parcels kernel for sampling fields during advection."""
 
         # make sure the fieldset has C code names assigned, etc.
         self.fieldset.check_complete()
 
         # string for the kernel itself
-        f_str = "def sample_kernel(particle, fieldset, time):\n"
+        f_str = f"def {kernel_name}(particle, fieldset, time):\n"
         for v in sample_variables:
-            f_str += f"\tparticle.var_{v} = fieldset.{v}.eval(time, particle.depth, particle.lat, particle.lon, applyConversion=False)\n"
+            f_str += f"\tparticle.{prefix}_{v} = fieldset.{v}.eval(time, particle.depth, particle.lat, particle.lon, applyConversion=False)\n"
         else:
             f_str += "\tpass"
 
         # create the kernel
-        self.sample_kernel = parcels.Kernel(
+        return parcels.Kernel(
             self.fieldset,
             self.particleclass.getPType(),
             funcname="sample_kernel",
@@ -614,13 +629,17 @@ class LagrangeFilter(object):
         # seed all particles at gridpoints
         ps = self.particleset(time)
         # execute the sample-only kernel to efficiently grab the initial condition
-        ps.kernel = self.sample_kernel
-        ps.execute(self.sample_kernel, runtime=0, dt=self.advection_dt)
+        ps.kernel = self.init_kernel
+        ps.execute(self.init_kernel, runtime=0, dt=self.advection_dt)
 
         # set up the temporary output file for the initial condition and
         # forward advection
         outfile = self._advection_cache_class(
-            ps, self.output_dt, self.sample_variables, **self._advection_cache_kwargs
+            ps,
+            self.output_dt,
+            self.sample_variables,
+            self.init_only_variables,
+            **self._advection_cache_kwargs,
         )
 
         # now the forward advection kernel can run
@@ -675,6 +694,9 @@ class LagrangeFilter(object):
 
             da_out[v] = (time_index_data, var_array)
 
+        for v in self.init_only_variables:
+            da_out[v] = outfile.data("forward")[v]
+
         if output_time:
             da_out["time"] = np.concatenate(
                 (
@@ -716,6 +738,8 @@ class LagrangeFilter(object):
         if self.inertial_filter is None:
             self.inertial_filter = Filter(self.filter_frequency, 1.0 / self.output_dt)
 
+        static_data = {v: advection_data[v] for v in self.init_only_variables}
+
         da_out = {}
         for v, a in advection_data.items():
             # don't try to filter the time axis, just take the middle value
@@ -723,9 +747,13 @@ class LagrangeFilter(object):
                 da_out[v] = a[a.size // 2]
                 continue
 
+            # don't filter our static data
+            if v in self.init_only_variables:
+                continue
+
             time_index_data, var_array = a
             da_out[v] = self.inertial_filter.apply_filter(
-                var_array, time_index_data, min_window=self._min_window
+                var_array, time_index_data, static_data, min_window=self._min_window
             )
 
         return da_out
@@ -978,7 +1006,7 @@ def ParticleFactory(variables, name="SamplingParticle", BaseClass=parcels.JITPar
 
     """
 
-    var_dict = {"var_" + v: parcels.Variable("var_" + v) for v in variables}
+    var_dict = {v: parcels.Variable(v) for v in variables}
 
     newclass = type(name, (BaseClass,), var_dict)
     return newclass
