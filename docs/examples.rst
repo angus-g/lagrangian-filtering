@@ -36,3 +36,38 @@ Now the filtering library will automatically seed particles at cell
 corners when performing advection/filtering. Underneath, OceanParcels
 will interpret the grid correctly, and interpolate the velocity
 components onto cell corners as well.
+
+
+Vorticity-based Filtering
+=========================
+
+Suppose we set up our filtering data as usual, but our input dataset
+contains an additional variable ``phi`` with the relative vorticity at
+a point. We want to vary our filter cutoff frequency depending on the
+vorticity, but we don't need to actually perform the Lagrangian
+filtering on vorticity. To achieve this, we pass our vorticity
+variable to the ``init_only_variables`` parameter:
+
+.. code-block:: python
+
+   f = LagrangeFilter(
+     "vorticity_filtering", filenames, variables, dimensions, sample_variables,
+     init_only_variables=["phi"], ...
+   )
+
+
+Now we write a function that takes the local vorticity at a point, and
+computes the required cutoff frequency. This function is used in a
+:class:`~filtering.filter.DataDependentFilter`.
+
+.. code-block:: python
+
+   from filtering import filter
+
+   def cutoff_func(state):
+     return state["init_phi"] ** 2
+
+   # sampling frequency fs
+   phi_filt = filter.DataDependentFilter(cutoff_func, fs)
+
+   f.inertial_filter = phi_filt
