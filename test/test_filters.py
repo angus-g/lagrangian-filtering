@@ -46,3 +46,30 @@ def test_spatial_filter():
     for freq, filter_obj in zip(f, filt._filter):
         w, h = signal.sosfreqz(filter_obj)
         assert np.all(abs(h)[w < freq] < 0.1)
+
+
+def test_data_filter(leewave_data):
+    """Test that variable frequencies are produced by the data-dependent filter."""
+
+    leewave_data["phi"] = leewave_data.t / 3600 + leewave_data.y + leewave_data.x ** 2
+
+    f = filtering.LagrangeFilter(
+        "data_filter",
+        leewave_data,
+        {"U": "U", "V": "V", "PHI": "phi"},
+        {"lon": "x", "lat": "y", "time": "t"},
+        ["U"],
+        init_only_variables=["PHI"],
+        window_size=3 * 24 * 3600,
+    )
+    f.make_zonally_periodic()
+    f.make_meridionally_periodic()
+
+    # pass vorticity through as cutoff frequency
+    filt = filtering.filter.DataDependentFilter(lambda x: x["init_PHI"], 3600)
+    f.inertial_filter = filt
+
+    adv = f.advection_step(7 * 24 * 3600)
+
+    # ensure the filtering doesn't throw an error
+    f.filter_step(adv)
