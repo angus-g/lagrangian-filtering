@@ -913,6 +913,14 @@ class LagrangeFilter(object):
         t = self.fieldset.time_origin.fulltime(t)
 
         if "units" not in ds[dim].ncattrs() or "calendar" not in ds[dim].ncattrs():
+            # if only one of the attributes is possible, we should
+            # warn that the result will be non-sensical!
+            if "units" in ds[dim].ncattrs() or "calendar" in ds[dim].ncattrs():
+                logging.warning(
+                    "data file for field '%s' has only one of 'units' and 'calendar' "
+                    "attributes, the output time data won't make sense",
+                    self._output_field,
+                )
             return t
 
         return xr.coding.times.encode_cf_datetime(
