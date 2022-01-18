@@ -19,6 +19,7 @@ GitHub_.
    installation
    algorithm
    data
+   filter
    exploring
    examples
    contributing

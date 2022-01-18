@@ -197,6 +197,7 @@ intersphinx_mapping = {
     "dask": ("https://docs.dask.org/en/stable/", None),
     "h5py": ("https://docs.h5py.org/en/stable/", None),
     "numpy": ("https://numpy.org/doc/1.18/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/reference/", None),
     "parcels": ("https://parcels-openmp.readthedocs.io/en/latest/", None),
     "xarray": ("http://xarray.pydata.org/en/stable/", None),
 }

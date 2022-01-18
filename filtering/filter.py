@@ -19,9 +19,10 @@ class Filter(object):
     applying the filter to advected particle data.
 
     Args:
-        frequency (float): The high-pass cutoff frequency of the filter.
+        frequency (float): The high-pass cutoff frequency of the filter
+            in [/s].
         fs (float): The sampling frequency of the data over which the
-            filter is applied.
+            filter is applied in [s].
 
     """
 
@@ -36,8 +37,9 @@ class Filter(object):
         frequency and sampling parameters.
 
         Args:
-            frequency (float): The high-pass angular cutoff frequency of the filter.
-            fs (float): The sampling frequency of the data.
+            frequency (float): The high-pass angular cutoff frequency of the filter
+                in [/s].
+            fs (float): The sampling frequency of the data in [s].
 
         """
 
@@ -129,9 +131,10 @@ class FrequencySpaceFilter(Filter):
     time-domain sinc function.
 
     Args:
-        frequency (float): The high-pass cutoff frequency of the filter.
+        frequency (float): The high-pass cutoff frequency of the filter
+            in [/s].
         fs (float): The sampling frequency of the daat over which the
-            filter is applied.
+            filter is applied in [s].
 
     """
 
@@ -173,9 +176,9 @@ class SpatialFilter(Filter):
         frequencies (numpy.ndarray): An array with the same number
             of elements as seeded particles, containing the cutoff
             frequency to be used for each particle.
-            cutoff frequency at that location.
+            cutoff frequency at that location in [/s].
         fs (float): The sampling frequency of the data over which the
-            filter is applied.
+            filter is applied in [s].
 
     """
 
@@ -190,8 +193,9 @@ class SpatialFilter(Filter):
         array of frequencies and sampling parameters.
 
         Args:
-            frequencies (numpy.ndarray): The high-pass angular cutoff frequencies of the filters.
-            fs (float): The sampling frequency of the data.
+            frequencies (numpy.ndarray): The high-pass cutoff frequencies of the filters
+                in [/s].
+            fs (float): The sampling frequency of the data in [s].
 
         """
 
