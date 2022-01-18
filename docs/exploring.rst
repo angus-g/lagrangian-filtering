@@ -40,3 +40,22 @@ over all particles could be computed at a specified time using
    f = LagrangeFilter(..., sample_variables["U", "V"], ...)
    spectra = analysis.power_spectrum(f, time)
    ke_spectrum = spectra["var_U"] + spectra["var_V"]
+
+
+Eulerian filtering
+==================
+
+It may be useful to compare Lagrangian-filtered data to
+Eulerian-filtered data, i.e. simply take the time series at each
+point, and apply the usual highpass filtering. To make the most direct
+comparison, this can be easily achieved within the same framework as
+the Lagrangian filtering. After constructing the filtering object,
+change the particle kernel to have only the sampling component. In
+effect, this deletes the advection component of the kernel, leaving a
+purely Eulerian filtering pipeline.
+
+.. code-block:: python
+
+   f = LagrangeFilter(...)
+   f.kernel = f.sample_kernel
+   ...
