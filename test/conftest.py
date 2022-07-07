@@ -70,8 +70,8 @@ def leewave_data():
     # eddy centre through advection
     xc = U * T
     # eddy field
-    psit1 = 0.05 * es * np.exp(-((X - xc) ** 2 + (Y - 50e3) ** 2) / es ** 2)
-    psit2 = 0.05 * es * np.exp(-((X - (xc + x[-1])) ** 2 + (Y - 50e3) ** 2) / es ** 2)
+    psit1 = 0.05 * es * np.exp(-((X - xc) ** 2 + (Y - 50e3) ** 2) / es**2)
+    psit2 = 0.05 * es * np.exp(-((X - (xc + x[-1])) ** 2 + (Y - 50e3) ** 2) / es**2)
     psit = psit1 + psit2
     VM = -d_dx(psit)
     UM = d_dy(psit)
