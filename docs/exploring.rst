@@ -59,3 +59,20 @@ purely Eulerian filtering pipeline.
    f = LagrangeFilter(...)
    f.kernel = f.sample_kernel
    ...
+
+
+Obtaining particle trajectories
+===============================
+
+As a bit of a sanity check, we could verify that the particles are
+taking sensible paths through our data. Usually, this is discarded,
+because it takes up extra memory, and is not actually used in the
+final result. We can ask for the position to be retained, so that we
+can examine the advection data:
+
+.. code-block:: python
+
+   f = LagrangeFilter(...)
+   f.sample_variables += ["lat", "lon"]
+   data = f.advection_step(time)
+   lat, lon = data["lat"][1], data["lon"][1]
