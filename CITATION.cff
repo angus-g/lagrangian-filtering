@@ -1,0 +1,39 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Lagrangian Filtering"
+doi: 10.5281/zenodo.4722045
+type: software
+date-released: 2021-04-27
+url: "https://github.com/angus-g/lagrangian-filtering"
+authors:
+  - family-names: Gibson
+    given-names: Angus H.
+    orcid: https://orcid.org/0000-0001-7577-3604
+  - family-names: Shakespeare
+    given-names: Callum J.
+    orcid: https://orcid.org/0000-0002-8109-0751
+preferred-citation:
+  title: "A New Open Source Implementation of Lagrangian Filtering: A Method to Identify Internal Waves in High-Resolution Simulations"
+  doi: 10.1029/2021MS002616
+  type: article
+  authors:
+    - family-names: Shakespeare
+      given-names: Callum J.
+      orcid: https://orcid.org/0000-0002-8109-0751
+    - family-names: Gibson
+      given-names: Angus H.
+      orcid: https://orcid.org/0000-0001-7577-3604
+    - family-names: Hogg
+      given-names: Andrew McC.
+      orcid: https://orcid.org/0000-0001-5898-7635
+    - family-names: Bachman
+      given-names: Scott D.
+      orcid: https://orcid.org/0000-0002-6479-4300
+    - family-names: Keating
+      given-names: Shane R.
+      orcid: https://orcid.org/0000-0002-6817-925X
+    - family-names: Velzeboer
+      given-names: Nick
+  journal: "Journal of Advances in Modeling Earth Systems"
+  year: 2021
+  volume: 13
