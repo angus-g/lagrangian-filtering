@@ -44,7 +44,11 @@ obtained by :py:func:`scipy.signal.butter`).
 There are other filters available in the :py:mod:`filtering.filter`
 module, such as one that performs the filtering in frequency space
 (may give a sharper cutoff, at the expense of possible ringing), or
-that allows variation of the cutoff frequency over the domain.
+that allows variation of the cutoff frequency over the
+domain. Alternatively, the default
+:py:class:`~filtering.filter.Filter` can be constructed with a
+different order, and as a highpass, lowpass, or bandpass filter,
+depending on the required application.
 
 If an alternate filter is constructed, it can be attached to the
 :py:class:`~filtering.filtering.LagrangeFilter`::

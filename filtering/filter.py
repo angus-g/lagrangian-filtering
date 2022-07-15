@@ -19,18 +19,20 @@ class Filter(object):
     applying the filter to advected particle data.
 
     Args:
-        frequency (float): The high-pass cutoff frequency of the filter
-            in [/s].
+        frequency (Union[float, Tuple[float, float]]): The low-pass or high-pass cutoff
+            frequency of the filter in [/s], or a pair denoting the band to pass.
         fs (float): The sampling frequency of the data over which the
             filter is applied in [s].
+        **kwargs (Optional): Additional arguments are passed to the
+            :func:`~create_filter` method.
 
     """
 
-    def __init__(self, frequency, fs):
-        self._filter = Filter.create_filter(frequency, fs)
+    def __init__(self, frequency, fs, **kwargs):
+        self._filter = Filter.create_filter(frequency, fs, **kwargs)
 
     @staticmethod
-    def create_filter(frequency, fs):
+    def create_filter(frequency, fs, order=4, filter_type="highpass"):
         """Create a filter.
 
         This creates an analogue Butterworth filter with the given
@@ -40,10 +42,13 @@ class Filter(object):
             frequency (float): The high-pass angular cutoff frequency of the filter
                 in [/s].
             fs (float): The sampling frequency of the data in [s].
+            order (Optional[int]): The filter order, default 4.
+            filter_type (Optional[str]): The type of filter, one of ("highpass",
+                "bandpass", "lowpass"), defaults to "highpass".
 
         """
 
-        return signal.butter(4, frequency, "highpass", fs=fs, output="sos")
+        return signal.butter(order, frequency, filter_type, fs=fs, output="sos")
 
     @staticmethod
     def pad_window(x, centre_index, min_window):
@@ -175,18 +180,19 @@ class SpatialFilter(Filter):
     Args:
         frequencies (numpy.ndarray): An array with the same number
             of elements as seeded particles, containing the cutoff
-            frequency to be used for each particle.
-            cutoff frequency at that location in [/s].
+            frequency to be used for each particle, in [/s].
         fs (float): The sampling frequency of the data over which the
             filter is applied in [s].
+        **kwargs (Optional): Additional arguments are passed to the
+            :func:`~create_filter` method.
 
     """
 
-    def __init__(self, frequencies, fs):
-        self._filter = SpatialFilter.create_filter(frequencies, fs)
+    def __init__(self, frequencies, fs, **kwargs):
+        self._filter = SpatialFilter.create_filter(frequencies, fs, **kwargs)
 
     @staticmethod
-    def create_filter(frequencies, fs):
+    def create_filter(frequencies, fs, order=4, filter_type="highpass"):
         """Create a series of filters.
 
         This creates an analogue Butterworth filter with the given
@@ -196,10 +202,14 @@ class SpatialFilter(Filter):
             frequencies (numpy.ndarray): The high-pass cutoff frequencies of the filters
                 in [/s].
             fs (float): The sampling frequency of the data in [s].
+            order (Optional[int]): The filter order, default 4.
+            filter_type (Optional[str]): The type of filter, one of ("highpass",
+                "lowpass"), defaults to "highpass". Note that bandpass spatial filters
+                aren't supported.
 
         """
 
-        return sosfilt.butter(4, frequencies, "highpass", fs=fs, output="sos")
+        return sosfilt.butter(order, frequencies, filter_type, fs=fs, output="sos")
 
     def apply_filter(self, data, time_index, min_window=None):
         """Apply the filter to an array of data."""
