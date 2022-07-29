@@ -22,6 +22,7 @@ GitHub_.
    filter
    exploring
    examples
+   issues
    contributing
    api
 
