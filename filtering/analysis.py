@@ -7,6 +7,7 @@ diagnostic output.
 
 import dask.array as da
 import numpy as np
+import xarray as xr
 
 
 def power_spectrum(filter, time):
@@ -24,8 +25,9 @@ def power_spectrum(filter, time):
         time (float): The time at which to perform the analysis.
 
     Returns:
-        Dict[str, numpy.ndarray]: A dictionary of power spectra for each of
-            the sampled variables on the filter.
+        :obj:`!xarray.Dataset`: An xarray Dataset of the power spectra
+            for each of the sampled variables on the filter, with the
+            frequency as a coordinate dimension.
 
     """
 
@@ -38,6 +40,6 @@ def power_spectrum(filter, time):
         mean_spectrum = da.nanmean(da.absolute(spectra) ** 2, axis=1)
         psds[v] = mean_spectrum.compute()
 
-    psds["freq"] = 2 * np.pi * np.fft.fftfreq(time_series.size, filter.output_dt)
+    freq = 2 * np.pi * np.fft.fftfreq(time_series.size, filter.output_dt)
 
-    return psds
+    return xr.Dataset(psds, coords={"freq": freq})
