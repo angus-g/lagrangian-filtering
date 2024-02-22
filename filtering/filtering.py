@@ -801,9 +801,11 @@ class LagrangeFilter(object):
             file_dim = dims[dim]
             if file_dim in ds.variables:
                 return ds.variables[file_dim].dimensions[
-                    1
-                    if len(ds.variables[file_dim].dimensions) > 1 and dim == "lon"
-                    else 0
+                    (
+                        1
+                        if len(ds.variables[file_dim].dimensions) > 1 and dim == "lon"
+                        else 0
+                    )
                 ]
 
             # get the file containing the dimension data as a DataArray
