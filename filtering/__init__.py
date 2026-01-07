@@ -1,8 +1,8 @@
-from pkg_resources import get_distribution, DistributionNotFound
+from importlib.metadata import version, PackageNotFoundError
 
 try:
-    __version__ = get_distribution("lagrangian-filtering").version
-except DistributionNotFound:
+    __version__ = version("lagrangian-filtering")
+except PackageNotFoundError:
     pass
 
 from filtering.filtering import LagrangeFilter

@@ -64,7 +64,7 @@ class LagrangeParticleFile(BaseParticleCache):
 
     """
 
-    def __init__(self, particleset, outputdt=np.infty, variables=None, output_dir="."):
+    def __init__(self, particleset, outputdt=np.inf, variables=None, output_dir="."):
         super().__init__(particleset, outputdt)
 
         self._tempfile = tempfile.NamedTemporaryFile(dir=output_dir, suffix=".h5")
@@ -202,7 +202,7 @@ class LagrangeParticleArray(BaseParticleCache):
 
     """
 
-    def __init__(self, particleset, outputdt=np.infty, variables=None):
+    def __init__(self, particleset, outputdt=np.inf, variables=None):
         super().__init__(particleset, outputdt)
 
         self.skip = 0
