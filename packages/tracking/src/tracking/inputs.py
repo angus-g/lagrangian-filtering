@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from glob import glob
 from pathlib import Path
-from typing import Any, Self
+from typing import Any, Literal, Self
 
 import numpy as np
 import xarray as xr
@@ -396,14 +396,18 @@ def open_flow(
     basis: BasisString,
     fields: Mapping[str, Variable] | None = None,
     origin: Date | None = None,
-    open_kwargs: Mapping[str, Any] | None = None
+    open_kwargs: Mapping[str, Any] | None = None,
+    combine: Literal["by_coords", "nested"] = "by_coords",
+    concat_dim: str | None = None,
 ):
     """Open explicit GridSpec/Variable descriptions into a reusable Flow.
 
     No variable-name, staggering, vector-basis or topology inference. Files
     shared by several descriptions are opened once. External xarray datasets
-    remain caller-owned. Globs/lists are combined by coordinates, with exact
-    spatial joins. Setup failure closes everything opened so far.
+    remain caller-owned. Globs/lists default to coordinate-based combination
+    with exact spatial joins. For preordered, compatible files, passe
+    ``combine="nested"`` and ``concat_dim`` to concatenate without coordinate
+    alignment. Setup failure closes everything opened so far.
 
     The default origin for decoded dates is the first selected U timestamp.
     U and V must have matching timestamps after conversion. The optional
@@ -414,6 +418,12 @@ def open_flow(
     forbidden = {"decode_cf", "decode_times", "mask_and_scale"}
     if any(kwargs.get(name) is False for name in forbidden):
         raise ValueError("open_flow requires CF time decoding and mask/scale processing")
+    if combine not in {"by_coords", "nested"}:
+        raise ValueError("combine must be by_coords or nested")
+    if combine == "nested" and concat_dim is None:
+        raise ValueError("nested combination requires concat_dim")
+    if combine == "by_coords" and concat_dim is not None:
+        raise ValueError("concat_dim only applies to nested combination")
 
     with ExitStack() as stack:
         datasets = {}
@@ -438,12 +448,19 @@ def open_flow(
                 if len(key) == 1:
                     ds = xr.open_dataset(key[0], **kwargs)
                 else:
+                    multi_kwargs: dict[str, Any] = {
+                        "combine": combine,
+                        "data_vars": "minimal",
+                        "coords": "minimal",
+                        "compat": "override" if combine == "nested" else "no_conflicts",
+                        "join": "override" if combine == "nested" else "exact",
+                    }
+                    if concat_dim is not None:
+                        multi_kwargs["concat_dim"] = concat_dim
+
                     ds = xr.open_mfdataset(
                         list(key),
-                        combine="by_coords",
-                        data_vars="minimal",
-                        coords="minimal",
-                        join="exact",
+                        **multi_kwargs,
                         **kwargs,
                     )
 
