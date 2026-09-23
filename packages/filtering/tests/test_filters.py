@@ -1,11 +1,8 @@
-import pytest
-
-import dask.array as da
-import numpy as np
-from scipy import signal
-import xarray as xr
-
 import filtering
+import numpy as np
+import pytest
+import tracking
+from scipy import signal
 
 
 @pytest.fixture
@@ -21,25 +18,54 @@ def lats_grid():
 def test_frequency_filter(leewave_data):
     """Test creation and application of frequency-space step filter."""
 
-    f = filtering.LagrangeFilter(
-        "frequency_filter",
-        leewave_data,
-        {"U": "U", "V": "V"},
-        {"lon": "x", "lat": "y", "time": "t"},
-        ["U"],
-        window_size=3 * 24 * 3600,
+    t = leewave_data["t"].values
+
+    g = tracking.Grid(
+        leewave_data.x,
+        leewave_data.y,
+        periodic_x=True,
+        periodic_y=True,
     )
-    f.make_zonally_periodic()
-    f.make_meridionally_periodic()
+    u = tracking.Field.from_xarray(
+        leewave_data["U"],
+        times=t,
+        time_dim="t",
+        y_dim="y",
+        x_dim="x",
+    )
+    v = tracking.Field.from_xarray(
+        leewave_data["V"],
+        times=leewave_data["t"].values,
+        time_dim="t",
+        y_dim="y",
+        x_dim="x",
+    )
+    tracker = tracking.Tracker(
+        g,
+        u,
+        v,
+        basis="geographic",
+        fields={"U": u}
+    )
+
+    time_spacing = t[1] - t[0]
 
     # attach filter to object
     filt = filtering.filter.FrequencySpaceFilter(1e-4, 3600)
-    f.inertial_filter = filt
+    workflow = filtering.WindowFilter(
+        tracker,
+        g.seed_grid(location="node"),
+        window=3 * 24 * 3600,
+        sample_dt=time_spacing,
+        advection_dt=5 * 60,
+        reducer=filt,
+    )
 
-    adv = f.advection_step(7 * 24 * 3600)
-    U_filt = f.filter_step(adv)["var_U"].reshape(leewave_data.y.size, -1)
+    result = workflow.on_seeds(
+        workflow.filter_at(7 * 24 * 3600)
+    )
 
-    assert np.all((leewave_data.U_orig.data - U_filt[0, :]) ** 2 < 3e-8)
+    assert np.all((leewave_data.U_orig.data[:-1] - result["U"][0, :]) ** 2 < 3e-8)
 
 
 def test_spatial_filter(lats_grid):
@@ -61,7 +87,7 @@ def test_spatial_filter(lats_grid):
 def test_create_filter(order, filter_type, freq):
     """Test parameters for filter creation."""
 
-    filt = filtering.filter.Filter(freq, 1, order=order, filter_type=filter_type)
+    _ = filtering.filter.Filter(freq, 1, order=order, filter_type=filter_type)
 
 
 @pytest.mark.parametrize("order", [3, 4])
@@ -70,7 +96,7 @@ def test_create_spatial_filter(lats_grid, order, filter_type):
     """Test parameters for spatial filter creation."""
 
     f = lats_grid * 0.1
-    filt = filtering.filter.SpatialFilter(
+    _ = filtering.filter.SpatialFilter(
         f.flatten(), 1, order=order, filter_type=filter_type
     )
 
@@ -80,4 +106,4 @@ def test_create_bandpass_spatial_filter(lats_grid):
 
     f = lats_grid * (0.1, 0.2)
     with pytest.raises(NotImplementedError):
-        filt = filtering.filter.SpatialFilter(f.flatten(), 1, filter_type="bandpass")
+        _ = filtering.filter.SpatialFilter(f.flatten(), 1, filter_type="bandpass")

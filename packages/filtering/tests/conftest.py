@@ -1,11 +1,12 @@
-import pytest
-
-from findiff import FinDiff
-import numpy as np
 import os
-import xarray as xr
+from pathlib import Path
 
-import filtering
+import numpy as np
+import pytest
+import xarray as xr
+from findiff import Diff
+
+TEST_DATA = Path(__file__).resolve().parent / "data"
 
 
 @pytest.fixture
@@ -24,21 +25,6 @@ def tmp_chdir(tmp_path):
 
 
 @pytest.fixture(scope="session")
-def nocompile_LagrangeFilter():
-    """A monkey-patched version of the LagrangeFilter that won't compile.
-
-    In tests where we don't actually perform advection, this saves us
-    a lot of time.
-    """
-
-    class F(filtering.LagrangeFilter):
-        def _compile(*args, **kwargs):
-            pass
-
-    return F
-
-
-@pytest.fixture(scope="session")
 def leewave_data():
     """Session-wide fixture containing lee wave data with an overlaid moving eddy and mean flow.
 
@@ -47,7 +33,7 @@ def leewave_data():
     """
 
     # lee wave velocity dataset
-    d = xr.open_dataset("test/data/lee_wave.nc")
+    d = xr.open_dataset(TEST_DATA / "lee_wave.nc")
 
     # mean flow velocity
     U = 0.2
@@ -64,8 +50,8 @@ def leewave_data():
     T, Y, X = np.meshgrid(t, y, x, indexing="ij")
 
     # finite difference operators
-    d_dx = FinDiff(2, dx)
-    d_dy = FinDiff(1, dy)
+    d_dx = Diff(2, dx)
+    d_dy = Diff(1, dy)
 
     # eddy centre through advection
     xc = U * T
@@ -88,3 +74,12 @@ def leewave_data():
         },
         coords={"x": x, "y": y, "t": t},
     )
+
+
+@pytest.fixture
+def null_reducer():
+    class R:
+        def apply_filter(self):
+            pass
+
+    return R()

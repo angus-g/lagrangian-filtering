@@ -9,7 +9,7 @@ import dask.array as da
 import numpy as np
 
 
-def power_spectrum(filter, time):
+def power_spectrum(workflow, time):
     """Compute the mean power spectrum over all particles at a given time.
 
     This routine gives the power spectrum (power spectral density) for
@@ -30,14 +30,15 @@ def power_spectrum(filter, time):
     """
 
     psds = {}
-    advection_data = filter.advection_step(time, output_time=True)
-    time_series = advection_data.pop("time")
 
-    for v, a in advection_data.items():
-        spectra = da.fft.fft(a[1].rechunk((-1, "auto")), axis=0)
-        mean_spectrum = da.nanmean(da.absolute(spectra) ** 2, axis=1)
-        psds[v] = mean_spectrum.compute()
+    with workflow.sample_window(time) as window:
+        for name, samples in window.samples.items():
+            spectra = da.fft.fft(samples.rechunk((-1, "auto")), axis=0)
+            mean_spectrum = da.nanmean(da.absolute(spectra) ** 2, axis=1)
+            psds[name] = mean_spectrum.compute()
 
-    psds["freq"] = 2 * np.pi * np.fft.fftfreq(time_series.size, filter.output_dt)
+        psds["freq"] = (
+            2 * np.pi * np.fft.fftfreq(window.times.size, d=workflow.sample_dt)
+        )
 
     return psds

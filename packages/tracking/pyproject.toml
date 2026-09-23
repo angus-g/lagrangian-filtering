@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lagrangian-tracking"
+version = "1.0.0"
+description = "Structured-grid horizontal advection and trajectory sampling"
+authors = [
+  {name = "Angus Gibson"},
+]
+readme ="README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+]
+dependencies = [
+  "numba",
+  "numpy",
+  "scipy",
+]
+
+[project.optional-dependencies]
+io = ["cftime", "dask[array]", "netCDF4", "xarray"]
+test = ["cftime", "dask[array]", "pytest", "scipy-stubs", "xarray"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

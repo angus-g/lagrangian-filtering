@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lagrangian-filtering"
+version = "1.0.0"
+description = "Temporal filtering of data in a Lagrangian frame of reference"
+authors = [
+  {name = "Angus Gibson"},
+]
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+]
+dependencies = [
+  "dask[array]",
+  "h5py",
+  "lagrangian-tracking",
+  "netCDF4",
+  "numpy",
+  "pykdtree",
+  "scipy",
+  "sosfilt",
+  "xarray",
+]
+
+[project.optional-dependencies]
+test = ["findiff", "optype[numpy]", "pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
