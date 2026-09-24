@@ -301,11 +301,11 @@ class Tracker:
                 "initial_index": initial_index,
                 "fields": {name: f"field-{k}.npy" for k, name in enumerate(selected)},
                 "status_codes": {
-                    "active": 0,
-                    "outside": 1,
-                    "dry": 2,
-                    "missing_velocity": 3,
-                    "step_failed": 4,
+                    "active": 1,
+                    "outside": 2,
+                    "dry": 3,
+                    "missing_velocity": 4,
+                    "step_failed": 5,
                 },
             }
             (directory / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
