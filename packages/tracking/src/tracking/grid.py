@@ -103,13 +103,17 @@ class Grid:
                 if spherical and not np.allclose(edge_dy, 0.0, rtol=0, atol=1.0e-10):
                     raise ValueError("spherical periodic seams must preserve latitude")
 
-        self.wet = (
-            np.ones((self.ny, self.nx), dtype=bool)
-            if wet is None
-            else np.array(wet, dtype=bool)
-        )
-        if self.wet.shape != (self.ny, self.nx):
-            raise ValueError("wet mask must have one value per cell")
+        if wet is not None:
+            if not np.isfinite(wet).all() or not np.isin(wet, [0, 1]).all():
+                raise ValueError("wet mask must contain only finite zero/one values")
+
+            self.wet = np.array(wet, dtype=bool)
+
+            if self.wet.shape != (self.ny, self.nx):
+                raise ValueError("wet mask must have one value per cell")
+        else:
+            self.wet = np.ones((self.ny, self.nx), dtype=bool)
+
         self.wet = np.ascontiguousarray(self.wet)
         j, i = np.indices(self.wet.shape)
 
