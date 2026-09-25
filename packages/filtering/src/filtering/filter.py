@@ -79,27 +79,26 @@ class Filter:
         """
 
         xn = np.isnan(x)
-        # particles which fit minimum window requirement
-        # that is, the number of non-NaN values is greater
-        # than the minimum window size
-        is_valid = np.count_nonzero(~xn, axis=-1)[:, None] >= min_window
+        # Count valid samples along time for each particle.
+        is_valid = np.count_nonzero(~xn, axis=0)[None, :] >= min_window
         # pad value indices -- the index, per-particle, of the last
         # non-NaN value in each direction (forward and backward)
-        pl = np.argmax(~xn, axis=-1)
-        pr = x.shape[1] - np.argmax(np.flip(~xn, axis=-1), axis=-1) - 1
+        pl = np.argmax(~xn, axis=0)
+        pr = x.shape[0] - np.argmax(np.flip(~xn, axis=0), axis=0) - 1
         # pad values -- get the value associated with the above index
-        vl = x[np.arange(x.shape[0]), pl]
-        vr = x[np.arange(x.shape[0]), pr]
+        particles = np.arange(x.shape[1])
+        vl = x[pl, particles]
+        vr = x[pr, particles]
         # do padding -- for valid particles according to the minimum
         # window size, set the backward NaN values to vl, and the
         # forward NaN values to vr
-        x[:, :centre_index] = np.where(
-            xn[:, :centre_index] & is_valid, vl[:, None], x[:, :centre_index]
+        x[:centre_index] = np.where(
+            xn[:centre_index] & is_valid, vl[None, :], x[:centre_index]
         )
-        x[:, centre_index + 1:] = np.where(
-            xn[:, centre_index + 1:] & is_valid,
-            vr[:, None],
-            x[:, centre_index + 1:],
+        x[centre_index + 1:] = np.where(
+            xn[centre_index + 1:] & is_valid,
+            vr[None, :],
+            x[centre_index + 1:],
         )
 
     def apply_filter(
@@ -111,7 +110,7 @@ class Filter:
         """Apply the filter to an array of data.
 
         Args:
-            data: A dask array of (time x particle) of advected particle data.
+            data: An array of (time x particle) of advected particle data.
             time_index: The index along the time dimension corresponding
                 to the central point, to extract after filtering.
             min_window: A minimum window size for considering
@@ -124,13 +123,14 @@ class Filter:
         """
 
         def filter_select(x):
+            # Dask passes the time core dimension last: (particle, time).
             if min_window is not None:
-                Filter.pad_window(x, time_index, min_window)
+                Filter.pad_window(x.T, time_index, min_window)
 
             return signal.sosfiltfilt(self._filter, x)[..., time_index]
 
         if isinstance(data, np.ndarray):
-            return filter_select(data)
+            return filter_select(data.T)
 
         # apply scipy filter as a ufunc
         # mapping an array to scalar over the first axis, automatically vectorize execution
@@ -278,13 +278,14 @@ class SpatialFilter(Filter):
         """
 
         def filter_select(filt, x):
+            # Dask passes the time core dimension last: (particle, time).
             if min_window is not None:
-                Filter.pad_window(x, time_index, min_window)
+                Filter.pad_window(x.T, time_index, min_window)
 
             return sosfilt.sosfiltfilt(filt, x)[..., time_index]
 
         if isinstance(data, np.ndarray):
-            return filter_select(self._filter, data)
+            return filter_select(self._filter, data.T)
 
         # we have to make sure the chunking of filter matches that of data
         data = data.rechunk((-1, "auto"))

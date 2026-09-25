@@ -5,6 +5,7 @@ from typing import Protocol
 import cftime
 import dask.array as da
 import numpy as np
+import optype.numpy as onp
 from numpy.typing import NDArray
 
 Date = datetime.datetime | cftime.datetime
@@ -16,8 +17,8 @@ Timespan = float | datetime.timedelta
 class FilterLike(Protocol):
     def apply_filter(
         self,
-        data: np.ndarray | da.Array,
+        data: onp.Array2D[np.float64] | da.Array,
         time_index: int,
         min_window: int | None = None
-    ) -> np.ndarray | da.Array:
+    ) -> onp.Array1D[np.float64] | da.Array:
         ...
